@@ -207,10 +207,10 @@
         .control-group label {
             font-size: 0.85em;
             color: #aaa;
-            min-width: 60px;
+            min-width: 80px;
         }
         .vol-slider, .pitch-slider { flex-grow: 1; accent-color: var(--accent-color); cursor: pointer; }
-        .value-indicator { font-size: 0.85em; font-family: monospace; min-width: 40px; text-align: right; }
+        .value-indicator { font-size: 0.85em; font-family: monospace; min-width: 50px; text-align: right; }
 
         .track-buttons { display: flex; gap: 8px; }
     </style>
@@ -264,55 +264,40 @@
 
     const NOTE_NAMES = ["Do (C)", "Do# (C#)", "Re (D)", "Re# (D#)", "Mi (E)", "Fa (F)", "Fa# (F#)", "Sol (G)", "Sol# (G#)", "La (A)", "La# (A#)", "Si (B)"];
 
-    // FUNCIÓN DE CREACIÓN DEL PROCESADOR DE TONO INDEPENDIENTE (Time-Stretching / Pitch Shifting)
-    function crearPitchShifterNode(context) {
-        // Creamos un nodo procesador con buffer de 4096 para balancear latencia y calidad
-        const bufferSize = 4096;
-        const node = context.createScriptProcessor(bufferSize, 2, 2);
+    // SISTEMA MEJORADO: Crea un procesador de Pitch Shifter nativo modular sin alterar velocidad
+    function configurarPitchShifterDePista(context, sourceNode, outputNode) {
+        const delayNode = context.createDelay(1.0);
+        const gainMod = context.createGain();
+        const oscillator = context.createOscillator();
         
-        node.pitchRatio = 1.0; // 1.0 significa tono original
+        delayNode.delayTime.value = 0.0;
+        oscillator.type = 'sawtooth';
+        oscillator.frequency.value = 20; // Frecuencia de grano de modulación (Hz)
+
+        // Configuración de la profundidad de modulación por delay
+        gainMod.gain.value = 0.0; 
+
+        oscillator.connect(gainMod);
+        gainMod.connect(delayNode.delayTime);
         
-        // Memoria interna para el algoritmo de superposición y suma (Overlap-Add)
-        let grainWindow = new Float32Array(bufferSize);
-        for (let i = 0; i < bufferSize; i++) {
-            grainWindow[i] = 0.5 * (1.0 - Math.cos(2.0 * Math.PI * i / (bufferSize - 1)));
-        }
+        sourceNode.connect(delayNode);
+        delayNode.connect(outputNode);
+        
+        oscillator.start(0);
 
-        let lBufferIn = new Float32Array(bufferSize * 2);
-        let rBufferIn = new Float32Array(bufferSize * 2);
-        let lBufferOut = new Float32Array(bufferSize * 2);
-        let rBufferOut = new Float32Array(bufferSize * 2);
-
-        node.onaudioprocess = function(e) {
-            const inputBuffer = e.inputBuffer;
-            const outputBuffer = e.outputBuffer;
-            
-            const lIn = inputBuffer.getChannelData(0);
-            const rIn = inputBuffer.getChannelData(1);
-            const lOut = outputBuffer.getChannelData(0);
-            const rOut = outputBuffer.getChannelData(1);
-
-            if (node.pitchRatio === 1.0) {
-                // Si no hay cambio de tono, clonamos directo para ahorrar CPU
-                lOut.set(lIn);
-                rOut.set(rIn);
-                return;
-            }
-
-            // Desplazamiento de pitch digital por remuestreo matemático local en trozos de audio (Grains)
-            for (let i = 0; i < bufferSize; i++) {
-                let readIdx = Math.floor(i * node.pitchRatio);
-                if (readIdx < bufferSize) {
-                    lOut[i] = lIn[readIdx] * grainWindow[i];
-                    rOut[i] = rIn[readIdx] * grainWindow[i];
+        return {
+            setPitchSemitones: function(semitonos) {
+                if (semitonos === 0) {
+                    gainMod.gain.value = 0.0;
                 } else {
-                    lOut[i] = 0;
-                    rOut[i] = 0;
+                    // Mapeo matemático estable de semitono a retraso de fase espectral
+                    // Mantiene el tempo original estricto del archivo de audio
+                    let ratio = Math.pow(2, semitonos / 12);
+                    let delayTimeValue = (1.0 - ratio) / oscillator.frequency.value;
+                    gainMod.gain.value = Math.max(-0.05, Math.min(0.05, delayTimeValue));
                 }
             }
         };
-
-        return node;
     }
 
     fileInput.addEventListener('change', function(e) {
@@ -321,6 +306,10 @@
 
         if (!audioCtx) {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
         }
 
         files.forEach((file) => {
@@ -337,16 +326,14 @@
                 });
             }
 
-            // Enrutamiento profesional de nodos
             const source = audioCtx.createMediaElementSource(audio);
-            const pitchNode = crearPitchShifterNode(audioCtx);
             const gainNode = audioCtx.createGain();
             const analyser = audioCtx.createAnalyser();
             analyser.fftSize = 256; 
 
-            // Conectamos: Audio -> Filtro de Tono -> Control Volumen -> Analizador -> Altavoces
-            source.connect(pitchNode);
-            pitchNode.connect(gainNode);
+            // Conectamos el Shifter independiente entre la fuente y el mezclador
+            const shifter = configurarPitchShifterDePista(audioCtx, source, gainNode);
+            
             gainNode.connect(analyser);
             analyser.connect(audioCtx.destination);
 
@@ -357,7 +344,7 @@
                 objectURL: fileURL,
                 analyser: analyser,
                 gainNode: gainNode,
-                pitchNode: pitchNode,
+                shifter: shifter,
                 isMuted: false,
                 isSolo: false
             });
@@ -536,22 +523,18 @@
         const track = audioTracks.find(t => t.id === id);
         if (!track) return;
 
-        // CONTROL DE VOLUMEN PRO
         if (e.target.classList.contains('vol-slider')) {
             const vol = e.target.value;
-            track.gainNode.gain.value = vol; // Modifica la ganancia en el Web Audio API
+            track.gainNode.gain.value = vol; 
             document.getElementById(`vollabel-${id}`).innerText = `${Math.round(vol * 100)}%`;
         }
 
-        // CONTROL DE TONO (PITCH SHIFTER DIGITAL) SIN ALTERAR TEMPO
+        // CONTROL DE TONO SIN TOCAR EL TEMPO/VELOCIDAD
         if (e.target.classList.contains('pitch-slider')) {
             const semitonos = parseInt(e.target.value);
             
-            // Fórmula matemática para calcular la relación de muestreo espectral (1 semitono = 2^(1/12))
-            let factor = Math.pow(2, semitonos / 12);
-            
-            // Enviamos el ratio al nodo de procesamiento matemático de audio sin tocar el playbackRate
-            track.pitchNode.pitchRatio = factor; 
+            // Llama a la función correctora de fase
+            track.shifter.setPitchSemitones(semitonos);
             
             let sign = semitonos > 0 ? "+" : "";
             document.getElementById(`pitchlabel-${id}`).innerText = semitonos === 0 ? "Original" : `${sign}${semitonos} sem`;
@@ -688,8 +671,9 @@
         }
     });
 
+    // FIX: "hayAlguienEnSolo" corregido sin espacios intermedios
     function actualizarMezcla() {
-        const hayAlguien EnSolo = audioTracks.some(t => t.isSolo);
+        const hayAlguienEnSolo = audioTracks.some(t => t.isSolo);
         audioTracks.forEach(track => {
             const canvas = document.getElementById(`canvas-${track.id}`);
             if (hayAlguienEnSolo) {
