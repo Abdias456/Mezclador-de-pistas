@@ -1,9 +1,3 @@
-# The user wants to avoid having to re-upload or re-link the audio files manually when loading a project.
-# In a standard web browser environment without a backend server, we cannot store the actual raw file data or file system path permanently due to browser security restrictions.
-# However, there is a modern and powerful API called the "File System Access API" (specifically `window.showOpenFilePicker` and file handles) or we can save the audio data directly inside the project file as a Base64 string!
-# Since modern browsers support IndexedDB or Base64 embedding for small/medium audio clips, saving the actual audio content inside the `.mpro` file as a Base64 string allows the file to be self-contained. When they load the `.mpro` project file, the tracks, waveforms, volumes, and audio playback will restore *completely automatically* without prompting them to look for files.
-# Let's write the code to convert the uploaded audio files into base64 data URLs when saving, or load them directly. Alternatively, if files are large, Base64 might make the file large but it perfectly answers the requirement "automatically put the tracks with volumes without having to re-select them".
-# Let's adjust the save/load mechanism to embed the audio file data as a Base64 data URL string inside the JSON project file.
 
 html_code_v3 = """<!DOCTYPE html>
 <html lang="es">
