@@ -3,8 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mezclador Multipista Pro (Motor Nativo Ultra-Limpio)</title>
+    <title>Mezclador Multipista Pro (Estudio + Tempo Fijo)</title>
     
+    <!-- IMPORTAMOS LA LIBRERÍA DE AUDIO PROFESIONAL JUNGLE -->
+    <script src="https://cdn.jsdelivr.net/gh/ctnelson/jungle@master/jungle-pitch-shifter.js"></script>
+
     <style>
         :root {
             --bg-color: #121212;
@@ -215,7 +218,7 @@
 
 <div class="container">
     <div class="app-header">
-        <h1>Mezclador Multipista Pro (Fidelidad de Estudio)</h1>
+        <h1>Mezclador Multipista Pro (Tempo Normal + Tono Pro)</h1>
     </div>
     
     <div class="upload-section">
@@ -225,7 +228,7 @@
     </div>
 
     <div class="global-pitch-container">
-        <div class="global-pitch-title">🎛️ Modificador de Tono General (Sin Distorsión)</div>
+        <div class="global-pitch-title">🎛️ Modificador de Tono General (Velocidad Fija)</div>
         <div class="control-row" style="background: #1a1f29;">
             <div class="control-group">
                 <label style="color: #ff9f43; font-weight: bold;">Tono Maestro</label>
@@ -271,11 +274,9 @@
     const globalPitchSlider = document.getElementById('global-pitch');
     const globalPitchLabel = document.getElementById('global-pitch-label');
 
-    // Función matemática nativa para cambiar tono sin romper los buffers de audio
-    function aplicarTonoFirme(audioElement, semitonos) {
-        // Calcula la tasa de reproducción matemática perfecta basada en la escala temperada de 12 semitonos
-        const ratio = Math.pow(2, semitonos / 12);
-        audioElement.playbackRate = ratio;
+    // Convierte semitonos a la relación matemática que entiende la librería Jungle
+    function semitonosARatio(semitonos) {
+        return Math.pow(2, semitonos / 12) - 1; // La librería requiere un valor de desfase relativo
     }
 
     globalPitchSlider.addEventListener('input', function(e) {
@@ -286,7 +287,9 @@
         audioTracks.forEach(track => {
             const trackSlider = document.querySelector(`.pitch-slider[data-id="${track.id}"]`);
             const localPitch = trackSlider ? parseInt(trackSlider.value) : 0;
-            aplicarTonoFirme(track.audioElement, localPitch + globalPitchShift);
+            
+            // Cambiamos el tono en el nodo inteligente de la librería externa
+            track.jungleNode.setPitchOffset(semitonosARatio(localPitch + globalPitchShift));
         });
     });
 
@@ -304,8 +307,8 @@
             audio.loop = true;
             audio.crossOrigin = "anonymous";
             
-            // ESTA ES LA CLAVE: Le dice al hardware del navegador que mantenga la velocidad estable
-            audio.preservesPitch = false; 
+            // Mantenemos la velocidad original del archivo de audio por hardware
+            audio.playbackRate = 1.0;
 
             if (audioTracks.length === 0) {
                 audio.addEventListener('loadedmetadata', () => actualizarDuracionGlobal());
@@ -316,11 +319,17 @@
             const analyser = audioCtx.createAnalyser();
             analyser.fftSize = 256; 
 
-            source.connect(gainNode);
+            // INICIALIZAMOS EL PITCH SHIFTER DE LA LIBRERÍA JUNGLE
+            const jungleNode = new Jungle(audioCtx);
+
+            // Conectamos la cadena de audio: Audio -> Shifter Profesional -> Volumen -> Analizador -> Parlantes
+            source.connect(jungleNode.input);
+            jungleNode.output.connect(gainNode);
             gainNode.connect(analyser);
             analyser.connect(audioCtx.destination);
 
-            aplicarTonoFirme(audio, globalPitchShift);
+            // Ajustamos el tono inicial basado en el control maestro
+            jungleNode.setPitchOffset(semitonosARatio(globalPitchShift));
 
             audioTracks.push({
                 id: trackId,
@@ -328,6 +337,7 @@
                 objectURL: fileURL,
                 analyser: analyser,
                 gainNode: gainNode,
+                jungleNode: jungleNode,
                 isMuted: false,
                 isSolo: false
             });
@@ -461,7 +471,10 @@
 
         if (e.target.classList.contains('pitch-slider')) {
             const semitonosLocales = parseInt(e.target.value);
-            aplicarTonoFirme(track.audioElement, semitonosLocales + globalPitchShift);
+            
+            // Combinar tono local con global usando la librería avanzada
+            track.jungleNode.setPitchOffset(semitonosARatio(semitonosLocales + globalPitchShift));
+            
             let sign = semitonosLocales > 0 ? "+" : "";
             document.getElementById(`pitchlabel-${id}`).innerText = semitonosLocales === 0 ? "Original" : `${sign}${semitonosLocales} sem`;
         }
@@ -594,7 +607,7 @@
     });
 
     function actualizarMezcla() {
-        const hayAlguienEnSolo = audioTracks.some(t => t.isSolo);
+        const hayAlguien EnSolo = audioTracks.some(t => t.isSolo);
         audioTracks.forEach(track => {
             const canvas = document.getElementById(`canvas-${track.id}`);
             if (hayAlguienEnSolo) {
