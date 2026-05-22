@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mezclador Multipista Pro (Estudio + Tempo Fijo)</title>
+    <title>Mezclador Multipista Pro (Tempo Normal + Tono Pro)</title>
     
     <!-- IMPORTAMOS LA LIBRERÍA DE AUDIO PROFESIONAL JUNGLE -->
     <script src="https://cdn.jsdelivr.net/gh/ctnelson/jungle@master/jungle-pitch-shifter.js"></script>
@@ -274,9 +274,8 @@
     const globalPitchSlider = document.getElementById('global-pitch');
     const globalPitchLabel = document.getElementById('global-pitch-label');
 
-    // Convierte semitonos a la relación matemática que entiende la librería Jungle
     function semitonosARatio(semitonos) {
-        return Math.pow(2, semitonos / 12) - 1; // La librería requiere un valor de desfase relativo
+        return Math.pow(2, semitonos / 12) - 1; 
     }
 
     globalPitchSlider.addEventListener('input', function(e) {
@@ -287,8 +286,6 @@
         audioTracks.forEach(track => {
             const trackSlider = document.querySelector(`.pitch-slider[data-id="${track.id}"]`);
             const localPitch = trackSlider ? parseInt(trackSlider.value) : 0;
-            
-            // Cambiamos el tono en el nodo inteligente de la librería externa
             track.jungleNode.setPitchOffset(semitonosARatio(localPitch + globalPitchShift));
         });
     });
@@ -307,7 +304,6 @@
             audio.loop = true;
             audio.crossOrigin = "anonymous";
             
-            // Mantenemos la velocidad original del archivo de audio por hardware
             audio.playbackRate = 1.0;
 
             if (audioTracks.length === 0) {
@@ -319,16 +315,13 @@
             const analyser = audioCtx.createAnalyser();
             analyser.fftSize = 256; 
 
-            // INICIALIZAMOS EL PITCH SHIFTER DE LA LIBRERÍA JUNGLE
             const jungleNode = new Jungle(audioCtx);
 
-            // Conectamos la cadena de audio: Audio -> Shifter Profesional -> Volumen -> Analizador -> Parlantes
             source.connect(jungleNode.input);
             jungleNode.output.connect(gainNode);
             gainNode.connect(analyser);
             analyser.connect(audioCtx.destination);
 
-            // Ajustamos el tono inicial basado en el control maestro
             jungleNode.setPitchOffset(semitonosARatio(globalPitchShift));
 
             audioTracks.push({
@@ -471,8 +464,6 @@
 
         if (e.target.classList.contains('pitch-slider')) {
             const semitonosLocales = parseInt(e.target.value);
-            
-            // Combinar tono local con global usando la librería avanzada
             track.jungleNode.setPitchOffset(semitonosARatio(semitonosLocales + globalPitchShift));
             
             let sign = semitonosLocales > 0 ? "+" : "";
