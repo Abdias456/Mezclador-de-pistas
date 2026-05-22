@@ -1,23 +1,17 @@
-
-html_code_v3 = """<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mezclador Multipista Pro TOTAL AUTO-LOAD</title>
+    <title>Mezclador Multipista Pro - Auto-Load</title>
     
-    <link rel="icon" type="image/png" href="logo.png">
-    <link rel="apple-touch-icon" href="logo.png">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
     <style>
         :root {
             --bg-color: #121212;
             --card-color: #1e1e1e;
             --text-color: #ffffff;
             --accent-color: #00adb5;
-            --sidebar-width: 280px;
+            --sidebar-width: 290px;
         }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -31,7 +25,7 @@ html_code_v3 = """<!DOCTYPE html>
             overflow-x: hidden;
         }
         .container {
-            max-width: 650px;
+            max-width: 700px;
             width: 100%;
             background: var(--card-color);
             padding: 20px;
@@ -49,40 +43,28 @@ html_code_v3 = """<!DOCTYPE html>
             border-bottom: 1px solid #333;
             padding-bottom: 10px;
         }
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        .app-logo {
-            width: 40px;
-            height: 40px;
-            border-radius: 8px;
-            object-fit: cover;
-            box-shadow: 0 2px 8px rgba(0,173,181,0.3);
-            background-color: var(--accent-color); 
-        }
         h1 { 
             color: var(--accent-color); 
             margin: 0; 
-            font-size: 1.5rem;
+            font-size: 1.4rem;
         }
 
         .menu-btn {
-            background: transparent;
-            border: none;
+            background: #222;
+            border: 1px solid #444;
             color: white;
-            font-size: 1.8rem;
+            font-size: 1.1rem;
             cursor: pointer;
-            padding: 5px 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: color 0.2s;
+            padding: 6px 12px;
+            border-radius: 6px;
+            transition: all 0.2s;
         }
-        .menu-btn:hover { color: var(--accent-color); }
+        .menu-btn:hover { 
+            color: var(--accent-color);
+            border-color: var(--accent-color);
+        }
 
-        /* SIDEBAR */
+        /* SIDEBAR (MENÚ PROYECTOS) */
         .sidebar {
             position: fixed;
             top: 0;
@@ -111,13 +93,12 @@ html_code_v3 = """<!DOCTYPE html>
             font-weight: bold;
             color: #b3efff;
             font-size: 1.1rem;
-            margin: 0;
         }
         .close-btn {
             background: transparent;
             border: none;
             color: #aaa;
-            font-size: 1.4rem;
+            font-size: 1.3rem;
             cursor: pointer;
         }
         .close-btn:hover { color: white; }
@@ -131,7 +112,7 @@ html_code_v3 = """<!DOCTYPE html>
             background-color: #23395b;
             color: #b3efff;
             font-size: 0.95em;
-            padding: 12px 15px;
+            padding: 12px;
             border-radius: 8px;
             width: 100%;
             text-align: center;
@@ -140,23 +121,21 @@ html_code_v3 = """<!DOCTYPE html>
             border: none;
             cursor: pointer;
             font-weight: bold;
+            transition: background 0.2s;
         }
         .btn-project:hover { background-color: #2c4a75; }
         #project-file-input { display: none; }
         
         .sidebar-overlay {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.6);
             z-index: 999;
             display: none;
         }
         .sidebar-overlay.show { display: block; }
 
-        /* Zona de carga */
+        /* ZONA DE CARGA MANUAL */
         .upload-section {
             border: 2px dashed #444;
             padding: 20px;
@@ -176,7 +155,7 @@ html_code_v3 = """<!DOCTYPE html>
         }
         #file-input { display: none; }
 
-        /* Controles */
+        /* CONTROLES GLOBALES */
         .global-controls {
             display: flex;
             justify-content: center;
@@ -208,13 +187,12 @@ html_code_v3 = """<!DOCTYPE html>
         }
         button.btn-delete:hover { background-color: #d32f2f; color: white; }
         
-        /* Timeline */
+        /* LÍNEA DE TIEMPO */
         .timeline-container {
             background: #252525;
             padding: 15px;
             border-radius: 8px;
             margin-bottom: 25px;
-            border-bottom: 1px solid #333;
         }
         .timeline-slider {
             width: 100%;
@@ -230,7 +208,7 @@ html_code_v3 = """<!DOCTYPE html>
             font-family: monospace;
         }
 
-        /* Tracks */
+        /* PISTAS DE AUDIO (TRACKS) */
         .track {
             background: #282828;
             padding: 15px;
@@ -272,10 +250,7 @@ html_code_v3 = """<!DOCTYPE html>
         }
         .vu-bar {
             position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            height: 0%; 
+            bottom: 0; left: 0; width: 100%; height: 0%; 
             background: linear-gradient(to top, #2ecc71 0%, #2ecc71 70%, #f1c40f 70%, #f1c40f 85%, #e74c3c 85%, #e74c3c 100%);
             transition: height 0.05s ease;
         }
@@ -290,25 +265,20 @@ html_code_v3 = """<!DOCTYPE html>
             cursor: pointer;
         }
         .waveform-canvas {
-            width: 100%;
-            height: 100%;
-            display: block;
+            width: 100%; height: 100%; display: block;
         }
         .playhead-line {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 2px;
-            height: 100%;
+            top: 0; left: 0; width: 2px; height: 100%;
             background-color: #ff5722;
             pointer-events: none;
             box-shadow: 0 0 4px #ff5722;
         }
 
         .track-controls { display: flex; align-items: center; gap: 10px; }
-        .vol-slider { flex-grow: 1; accent-color: var(--accent-color); }
+        .vol-slider { flex-grow: 1; accent-color: var(--accent-color); cursor: pointer; }
 
-        /* Indicador de carga de proyecto */
+        /* PANTALLA DE PROCESAMIENTO / LOADING */
         .loading-overlay {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -322,8 +292,7 @@ html_code_v3 = """<!DOCTYPE html>
         }
         .spinner {
             border: 4px solid rgba(255,255,255,0.1);
-            width: 50px;
-            height: 50px;
+            width: 50px; height: 50px;
             border-radius: 50%;
             border-left-color: var(--accent-color);
             animation: spin 1s linear infinite;
@@ -336,38 +305,37 @@ html_code_v3 = """<!DOCTYPE html>
 
 <div id="loading-project" class="loading-overlay">
     <div class="spinner"></div>
-    <div id="loading-text" style="font-weight: bold; font-size: 1.1em;">Guardando proyecto con audios integrados...</div>
+    <div id="loading-text" style="font-weight: bold; font-size: 1.1em; text-align: center; padding: 0 20px;">Procesando archivos de audio integrados...</div>
 </div>
 
 <div id="sidebar-overlay" class="sidebar-overlay"></div>
 
 <div id="sidebar" class="sidebar">
     <div class="sidebar-header">
-        <span class="sidebar-title">Proyectos</span>
+        <span class="sidebar-title">📂 Proyectos (.mpro)</span>
         <button id="close-sidebar-btn" class="close-btn">✕</button>
     </div>
     <div class="project-actions">
-        <button id="btn-save-project" class="btn-project">💾 Guardar Proyecto Completo</button>
+        <button id="btn-save-project" class="btn-project">💾 Guardar Todo Autónomo</button>
         <label for="project-file-input" class="btn-project">📂 Cargar Proyecto</label>
         <input type="file" id="project-file-input" accept=".mpro">
     </div>
-    <p style="font-size:0.75em; color:#8ab4f8; margin-top:15px; line-height:1.4;">💡 El archivo guardará todo el audio dentro. Al cargarlo, se abrirá al instante sin pedir los archivos originales.</p>
+    <p style="font-size:0.78em; color:#8ab4f8; margin-top:15px; line-height:1.4; text-align: justify;">
+        💡 Al guardar, el audio real se empaqueta dentro del archivo. Cuando lo abras en el futuro, las pistas aparecerán con sus volúmenes y formas de onda automáticamente sin pedirte relinkear nada.
+    </p>
 </div>
 
 <div class="container">
     <div class="app-header">
-        <div class="header-left">
-            <img src="logo.png" alt="Logo" class="app-logo" onerror="this.style.display='none'">
-            <h1>Mi Mezclador Pro Audio</h1>
-        </div>
-        <button id="open-sidebar-btn" class="menu-btn">☰</button>
+        <h1>Mezclador Multipista Pro</h1>
+        <button id="open-sidebar-btn" class="menu-btn">Proyectos ☰</button>
     </div>
     
     <div class="upload-section">
-        <p style="margin-top:0;">Selecciona tus pistas de audio para comenzar</p>
-        <label for="file-input" class="file-input-label">📁 Cargar Pistas</label>
+        <p style="margin-top:0; color:#ccc;">Añade audios para tu sesión</p>
+        <label for="file-input" class="file-input-label">➕ Añadir Tracks</label>
         <input type="file" id="file-input" accept="audio/*" multiple>
-        <div id="file-count" style="font-size: 0.85em; margin-top: 10px; color: #aaa;">Ninguna pista cargada</div>
+        <div id="file-count" style="font-size: 0.85em; margin-top: 10px; color: #888;">0 pistas activas</div>
     </div>
 
     <div class="global-controls">
@@ -418,14 +386,14 @@ html_code_v3 = """<!DOCTYPE html>
     closeSidebarBtn.addEventListener('click', cerrarMenu);
     sidebarOverlay.addEventListener('click', cerrarMenu);
 
-    // GUARDAR PROYECTO CON AUDIOS INTEGRADOS (BASE64)
+    // GUARDAR PROYECTO AUTÓNOMO CON BASE64 INTEGRADO
     document.getElementById('btn-save-project').addEventListener('click', async () => {
         if (audioTracks.length === 0) {
-            alert("No tienes ninguna pista cargada para guardar.");
+            alert("No hay pistas musicales en el mezclador para guardar.");
             return;
         }
 
-        loadingText.innerText = "Empaquetando pistas de audio en el proyecto... Por favor espera.";
+        loadingText.innerText = "Codificando e integrando audios dentro del archivo del proyecto...\nPor favor espera.";
         loadingOverlay.style.display = "flex";
 
         try {
@@ -435,7 +403,6 @@ html_code_v3 = """<!DOCTYPE html>
                 const trackNode = document.getElementById(`node-${track.id}`);
                 const volInput = trackNode ? trackNode.querySelector('.vol-slider') : null;
                 
-                // Convertimos el blob/file original a Base64 para guardarlo dentro del archivo
                 const respuesta = await fetch(track.objectURL);
                 const blob = await respuesta.blob();
                 const base64Audio = await blobToBase64(blob);
@@ -455,26 +422,26 @@ html_code_v3 = """<!DOCTYPE html>
             
             const a = document.createElement('a');
             a.href = urlDescarga;
-            a.download = `proyecto_completo_${new Date().toISOString().slice(0,10)}.mpro`;
+            a.download = `proyecto_autosuficiente_${new Date().toISOString().slice(0,10)}.mpro`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(urlDescarga);
             cerrarMenu();
         } catch (error) {
-            alert("Hubo un error al empaquetar el proyecto.");
+            alert("No se pudo empaquetar el proyecto.");
             console.error(error);
         } finally {
             loadingOverlay.style.display = "none";
         }
     });
 
-    // CARGAR PROYECTO AUTOMÁTICO (EMPAQUETADO)
+    // CARGAR PROYECTO Y RECONSTRUIR AUTOMÁTICAMENTE VOLÚMENES Y PISTAS
     projectFileInput.addEventListener('change', (e) => {
         const archivo = e.target.files[0];
         if (!archivo) return;
 
-        loadingText.innerText = "Abriendo proyecto y restaurando canales de audio...";
+        loadingText.innerText = "Cargando proyecto y reconstruyendo pistas con sus volúmenes...";
         loadingOverlay.style.display = "flex";
         cerrarMenu();
 
@@ -482,7 +449,7 @@ html_code_v3 = """<!DOCTYPE html>
         reader.onload = async function(evt) {
             try {
                 const datos = JSON.parse(evt.target.result);
-                if (!Array.isArray(datos)) throw new Error("Formato no válido");
+                if (!Array.isArray(datos)) throw new Error("Archivo corrupto o no válido");
 
                 limpiarTodo();
 
@@ -491,7 +458,6 @@ html_code_v3 = """<!DOCTYPE html>
                 }
 
                 for (let config of datos) {
-                    // Convertir el string base64 de vuelta a un objeto usable por el navegador
                     const blobAudio = dataURLtoBlob(config.audioDataUrl);
                     const fileURL = URL.createObjectURL(blobAudio);
                     
@@ -553,15 +519,14 @@ html_code_v3 = """<!DOCTYPE html>
                     `;
                     container.appendChild(trackDiv);
 
+                    // Asignación automática del volumen guardado
                     audio.volume = config.volume;
 
-                    // Dibujar mapa de onda
                     const canvas = document.getElementById(`canvas-${trackId}`);
                     canvas.width = canvas.offsetWidth;
                     generarFormaDeOndaDesdeBlob(blobAudio, canvas, trackId);
                     activarVuMeter(trackId, analyser, audio);
 
-                    // Listener para cliquear en la línea de tiempo de la pista
                     const waveContainer = document.getElementById(`wave-container-${trackId}`);
                     waveContainer.addEventListener('click', function(event) {
                         if (audioTracks.length === 0) return;
@@ -577,11 +542,11 @@ html_code_v3 = """<!DOCTYPE html>
                 actualizarMezcla();
                 
             } catch (err) {
-                alert("Ocurrió un error al cargar el archivo de proyecto.");
+                alert("Error al cargar el archivo .mpro");
                 console.error(err);
             } finally {
                 loadingOverlay.style.display = "none";
-                projectFileInput.value = ""; // reset
+                projectFileInput.value = ""; 
             }
         };
         reader.readAsText(archivo);
@@ -597,11 +562,9 @@ html_code_v3 = """<!DOCTYPE html>
     }
 
     function dataURLtoBlob(dataurl) {
-        var arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
+        let arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
             bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
-        while(n--){
-            u8arr[n] = bstr.charCodeAt(n);
-        }
+        while(n--){ u8arr[n] = bstr.charCodeAt(n); }
         return new Blob([u8arr], {type:mime});
     }
 
@@ -616,7 +579,7 @@ html_code_v3 = """<!DOCTYPE html>
         actualizarContadorEtiqueta();
     }
 
-    // CARGA DE AUDIO MANUAL
+    // CARGA MANUAL DE CANCIONES SUELTAS
     fileInput.addEventListener('change', function(e) {
         const files = Array.from(e.target.files);
         if (files.length === 0) return;
@@ -691,7 +654,7 @@ html_code_v3 = """<!DOCTYPE html>
             generarFormaDeOndaDesdeBlob(file, canvas, trackId);
             activarVuMeter(trackId, analyser, audio);
 
-            const waveContainer = document.getElementById(`wave-container-${trackId}`);
+            const waveContainer = document.getElementById('wave-container-' + trackId);
             waveContainer.addEventListener('click', function(event) {
                 if (audioTracks.length === 0) return;
                 const rect = waveContainer.getBoundingClientRect();
@@ -773,7 +736,7 @@ html_code_v3 = """<!DOCTYPE html>
 
     function actualizarContadorEtiqueta() {
         if (audioTracks.length === 0) {
-            fileCountLabel.innerText = "Ninguna pista cargada";
+            fileCountLabel.innerText = "0 pistas activas";
             timeline.disabled = true;
             timeline.value = 0;
             timeCurrentLabel.innerText = "00:00";
@@ -935,5 +898,4 @@ html_code_v3 = """<!DOCTYPE html>
 </script>
 
 </body>
-</html>"""
-
+</html>
