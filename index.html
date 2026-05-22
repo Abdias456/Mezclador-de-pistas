@@ -607,7 +607,7 @@
     });
 
     function actualizarMezcla() {
-        const hayAlguien EnSolo = audioTracks.some(t => t.isSolo);
+        const hayAlguienEnSolo = audioTracks.some(t => t.isSolo);
         audioTracks.forEach(track => {
             const canvas = document.getElementById(`canvas-${track.id}`);
             if (hayAlguienEnSolo) {
