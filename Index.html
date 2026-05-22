@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mezclador Multipista Pro Dynamic</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --card-color: #1e1e1e;
+            --text-color: #ffffff;
+            --accent-color: #00adb5;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            max-width: 600px;
+            width: 100%;
+            background: var(--card-color);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            box-sizing: border-box;
+        }
+        h1 { text-align: center; color: var(--accent-color); margin-top: 0; }
+        
+        /* Zona de carga de archivos */
+        .upload-section {
+            border: 2px dashed #444;
+            padding: 20px;
+            text-align: center;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            background: #1a1a1a;
+        }
+        .file-input-label {
+            background-color: var(--accent-color);
+            color: #121212;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            display: inline-block;
+        }
+        #file-input { display: none; }
+
+        /* Controles Globales de Reproducción */
+        .global-controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        button {
+            background-color: #333;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        button:active { transform: scale(0.95); }
+        .btn-main { background-color: var(--accent-color); color: #121212; }
+        button.active-solo { background-color: #ff5722; color: white; }
+        button.active-mute { background-color: #d32f2f; color: white; }
+        
+        /* Botón de eliminar pista */
+        button.btn-delete {
+            background-color: #3a1a1a;
+            color: #ff5252;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.85em;
+        }
+        button.btn-delete:hover {
+            background-color: #d32f2f;
+            color: white;
+        }
+        
+        /* Línea de tiempo / Timeline */
+        .timeline-container {
+            background: #252525;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            border-bottom: 1px solid #333;
+        }
+        .timeline-slider {
+            width: 100%;
+            accent-color: var(--accent-color);
+            cursor: pointer;
+            margin-bottom: 8px;
+        }
+        .time-display {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9em;
+            color: #aaa;
+            font-family: monospace;
+        }
+
+        /* Pistas individuales */
+        .track {
+            background: #282828;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border-left: 4px solid var(--accent-color);
+        }
+        .track-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            margin-bottom: 10px;
+            gap: 10px;
+        }
+        .track-name-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            overflow: hidden;
+            flex-grow: 1;
+        }
+        .track-title-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .track-controls { display: flex; align-items: center; gap: 10px; }
+        .vol-slider { flex-grow: 1; accent-color: var(--accent-color); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Mi Mezclador Pro</h1>
+    
+    <div class="upload-section">
+        <p style="margin-top:0;">Selecciona tus pistas de audio a la vez</p>
+        <label for="file-input" class="file-input-label">📁 Cargar Pistas</label>
+        <input type="file" id="file-input" accept="audio/*" multiple>
+        <div id="file-count" style="font-size: 0.85em; margin-top: 10px; color: #aaa;">Ninguna pista cargada</div>
+    </div>
+
+    <div class="global-controls">
+        <button id="btn-rewind">⏪ -10s</button>
+        <button id="btn-play" class="btn-main">▶ Play</button>
+        <button id="btn-pause">⏸ Pause</button>
+        <button id="btn-stop">⏹ Stop</button>
+        <button id="btn-forward">⏩ +10s</button>
+    </div>
+
+    <div class="timeline-container">
+        <input type="range" id="timeline" class="timeline-slider" min="0" max="100" value="0" disabled>
+        <div class="time-display">
+            <span id="time-current">00:00</span>
+            <span id="time-total">00:00</span>
+        </div>
+    </div>
+
+    <div id="tracks-container"></div>
+</div>
+
+<script>
+    let audioTracks = []; 
+    let isPlaying = false;
+    let userIsSeeking = false; 
+    let trackCounter = 0; 
+
+    const fileInput = document.getElementById('file-input');
+    const container = document.getElementById('tracks-container');
+    const fileCountLabel = document.getElementById('file-count');
+    const timeline = document.getElementById('timeline');
+    const timeCurrentLabel = document.getElementById('time-current');
+    const timeTotalLabel = document.getElementById('time-total');
+
+    // Cargar archivos
+    fileInput.addEventListener('change', function(e) {
+        const files = e.target.files;
+        if (files.length === 0) return;
+
+        Array.from(files).forEach((file) => {
+            trackCounter++;
+            const trackId = `track-${trackCounter}`;
+            const fileURL = URL.createObjectURL(file);
+            const audio = new Audio(fileURL);
+            audio.loop = true;
+
+            if (audioTracks.length === 0) {
+                audio.addEventListener('loadedmetadata', () => {
+                    actualizarDuracionGlobal();
+                });
+            }
+
+            if (isPlaying && audioTracks.length > 0) {
+                audio.currentTime = audioTracks[0].audioElement.currentTime;
+                audio.play().catch(e => {});
+            }
+
+            audioTracks.push({
+                id: trackId,
+                audioElement: audio,
+                objectURL: fileURL,
+                isMuted: false,
+                isSolo: false
+            });
+
+            // Interfaz de la pista
+            const trackDiv = document.createElement('div');
+            trackDiv.className = 'track';
+            trackDiv.id = `node-${trackId}`;
+            trackDiv.innerHTML = `
+                <div class="track-header">
+                    <div class="track-name-wrapper">
+                        <button class="btn-delete" data-id="${trackId}" title="Quitar pista">❌</button>
+                        <span class="track-title-text">${file.name.replace(/\.[^/.]+$/, "")}</span>
+                    </div>
+                    <span class="vol-label">100%</span>
+                </div>
+                <div class="track-controls">
+                    <button class="btn-mute" data-id="${trackId}">Mute</button>
+                    <button class="btn-solo" data-id="${trackId}">Solo</button>
+                    <input type="range" class="vol-slider" data-id="${trackId}" min="0" max="1" step="0.01" value="1">
+                </div>
+            `;
+            container.appendChild(trackDiv);
+        });
+
+        actualizarContadorEtiqueta();
+        actualizarMezcla(); 
+    });
+
+    function actualizarContadorEtiqueta() {
+        if (audioTracks.length === 0) {
+            fileCountLabel.innerText = "Ninguna pista cargada";
+            timeline.disabled = true;
+            timeline.value = 0;
+            timeCurrentLabel.innerText = "00:00";
+            timeTotalLabel.innerText = "00:00";
+        } else {
+            fileCountLabel.innerText = `${audioTracks.length} pista(s) activa(s) en la mezcla.`;
+            actualizarDuracionGlobal();
+        }
+    }
+
+    function actualizarDuracionGlobal() {
+        if (audioTracks.length > 0) {
+            const master = audioTracks[0].audioElement;
+            if (!isNaN(master.duration)) {
+                timeline.max = master.duration;
+                timeline.disabled = false;
+                timeTotalLabel.innerText = formatTime(master.duration);
+            }
+        }
+    }
+
+    // Controles globales
+    document.getElementById('btn-play').addEventListener('click', () => {
+        if (isPlaying || audioTracks.length === 0) return;
+        isPlaying = true;
+        audioTracks.forEach(track => track.audioElement.play().catch(e => {}));
+    });
+
+    document.getElementById('btn-pause').addEventListener('click', () => {
+        isPlaying = false;
+        audioTracks.forEach(track => track.audioElement.pause());
+    });
+
+    document.getElementById('btn-stop').addEventListener('click', () => {
+        isPlaying = false;
+        audioTracks.forEach(track => {
+            track.audioElement.pause();
+            track.audioElement.currentTime = 0;
+        });
+        if (!userIsSeeking) timeline.value = 0;
+        timeCurrentLabel.innerText = "00:00";
+    });
+
+    // Avanzar y retroceder
+    document.getElementById('btn-forward').addEventListener('click', () => {
+        if (audioTracks.length === 0) return;
+        let targetTime = audioTracks[0].audioElement.currentTime + 10;
+        if (targetTime > audioTracks[0].audioElement.duration) targetTime = audioTracks[0].audioElement.duration;
+        sincronizarTiempoA(targetTime);
+    });
+
+    document.getElementById('btn-rewind').addEventListener('click', () => {
+        if (audioTracks.length === 0) return;
+        let targetTime = audioTracks[0].audioElement.currentTime - 10;
+        if (targetTime < 0) targetTime = 0;
+        sincronizarTiempoA(targetTime);
+    });
+
+    // Línea de tiempo
+    timeline.addEventListener('input', () => {
+        userIsSeeking = true;
+        timeCurrentLabel.innerText = formatTime(timeline.value);
+    });
+
+    timeline.addEventListener('change', () => {
+        const nuevoTiempo = parseFloat(timeline.value);
+        sincronizarTiempoA(nuevoTiempo);
+        userIsSeeking = false;
+    });
+
+    function sincronizarTiempoA(segundos) {
+        audioTracks.forEach(track => {
+            track.audioElement.currentTime = segundos;
+        });
+        timeline.value = segundos;
+        timeCurrentLabel.innerText = formatTime(segundos);
+    }
+
+    setInterval(() => {
+        if (audioTracks.length > 0 && isPlaying && !userIsSeeking) {
+            const masterTime = audioTracks[0].audioElement.currentTime;
+            timeline.value = masterTime;
+            timeCurrentLabel.innerText = formatTime(masterTime);
+        }
+    }, 250);
+
+    // Volumen individual
+    container.addEventListener('input', (e) => {
+        if (e.target.classList.contains('vol-slider')) {
+            const id = e.target.dataset.id;
+            const vol = e.target.value;
+            const track = audioTracks.find(t => t.id === id);
+            if (track) {
+                track.audioElement.volume = vol;
+                e.target.closest('.track').querySelector('.vol-label').innerText = `${Math.round(vol * 100)}%`;
+            }
+        }
+    });
+
+    // Clicks en pistas (Mute, Solo, Eliminar)
+    container.addEventListener('click', (e) => {
+        const id = e.target.dataset.id;
+        if (!id) return;
+
+        if (e.target.classList.contains('btn-delete')) {
+            const index = audioTracks.findIndex(t => t.id === id);
+            if (index !== -1) {
+                audioTracks[index].audioElement.pause();
+                URL.revokeObjectURL(audioTracks[index].objectURL);
+                audioTracks.splice(index, 1);
+                const trackNode = document.getElementById(`node-${id}`);
+                if (trackNode) trackNode.remove();
+                
+                actualizarContadorEtiqueta();
+                actualizarMezcla();
+            }
+            return;
+        }
+
+        const track = audioTracks.find(t => t.id === id);
+        if (!track) return;
+
+        if (e.target.classList.contains('btn-mute')) {
+            track.isMuted = !track.isMuted;
+            e.target.classList.toggle('active-mute', track.isMuted);
+            actualizarMezcla();
+        }
+
+        if (e.target.classList.contains('btn-solo')) {
+            track.isSolo = !track.isSolo;
+            e.target.classList.toggle('active-solo', track.isSolo);
+            actualizarMezcla();
+        }
+    });
+
+    function actualizarMezcla() {
+        const hayAlguienEnSolo = audioTracks.some(t => t.isSolo);
+        audioTracks.forEach(track => {
+            if (hayAlguienEnSolo) {
+                track.audioElement.muted = !track.isSolo || track.isMuted;
+            } else {
+                track.audioElement.muted = track.isMuted;
+            }
+        });
+    }
+
+    function formatTime(time) {
+        if (isNaN(time)) return "00:00";
+        const mins = String(Math.floor(time / 60)).padStart(2, '0');
+        const secs = String(Math.floor(time % 60)).padStart(2, '0');
+        return `${mins}:${secs}`;
+    }
+</script>
+
+</body>
+</html>
