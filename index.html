@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mezclador Multipista Pro (Pitch Shifter Independiente)</title>
+    <title>Mezclador Multipista Pro (Pitch Shifter General)</title>
     
     <style>
         :root {
@@ -11,6 +11,7 @@
             --card-color: #1e1e1e;
             --text-color: #ffffff;
             --accent-color: #00adb5;
+            --global-accent: #ff9f43;
         }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -62,6 +63,24 @@
             display: inline-block;
         }
         #file-input { display: none; }
+
+        /* SECCIÓN DE TONO GLOBAL */
+        .global-pitch-container {
+            background: #222831;
+            border: 1px solid var(--global-accent);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .global-pitch-title {
+            margin: 0 0 10px 0;
+            font-size: 1em;
+            color: var(--global-accent);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: bold;
+            text-align: center;
+        }
 
         .global-controls {
             display: flex;
@@ -207,9 +226,10 @@
         .control-group label {
             font-size: 0.85em;
             color: #aaa;
-            min-width: 80px;
+            min-width: 90px;
         }
-        .vol-slider, .pitch-slider { flex-grow: 1; accent-color: var(--accent-color); cursor: pointer; }
+        .vol-slider, .pitch-slider, .global-pitch-slider { flex-grow: 1; accent-color: var(--accent-color); cursor: pointer; }
+        .global-pitch-slider { accent-color: var(--global-accent); }
         .value-indicator { font-size: 0.85em; font-family: monospace; min-width: 50px; text-align: right; }
 
         .track-buttons { display: flex; gap: 8px; }
@@ -219,7 +239,7 @@
 
 <div class="container">
     <div class="app-header">
-        <h1>Mezclador Multipista + Pitch Shifter (Tempo Fijo)</h1>
+        <h1>Mezclador Multipista + Control de Tono General</h1>
     </div>
     
     <div class="upload-section">
@@ -227,6 +247,18 @@
         <label for="file-input" class="file-input-label">📁 Seleccionar Audios</label>
         <input type="file" id="file-input" accept="audio/*" multiple>
         <div id="file-count" style="font-size: 0.85em; margin-top: 10px; color: #888;">0 pistas activas</div>
+    </div>
+
+    <!-- NUEVO: CONTROL DE TONO GENERAL/MAESTRO -->
+    <div class="global-pitch-container">
+        <div class="global-pitch-title">🎛️ Modificador de Tono General (Afecta a todo)</div>
+        <div class="control-row" style="background: #1a1f29;">
+            <div class="control-group">
+                <label style="color: #ff9f43; font-weight: bold;">Tono Maestro</label>
+                <input type="range" id="global-pitch" class="global-pitch-slider" min="-6" max="6" step="1" value="0">
+                <span class="value-indicator" id="global-pitch-label" style="color: #ff9f43; font-weight: bold;">Original</span>
+            </div>
+        </div>
     </div>
 
     <div class="global-controls">
@@ -254,6 +286,7 @@
     let userIsSeeking = false; 
     let trackCounter = 0; 
     let audioCtx = null; 
+    let globalPitchShift = 0; // Estado del tono maestro
 
     const fileInput = document.getElementById('file-input');
     const container = document.getElementById('tracks-container');
@@ -261,10 +294,11 @@
     const timeline = document.getElementById('timeline');
     const timeCurrentLabel = document.getElementById('time-current');
     const timeTotalLabel = document.getElementById('time-total');
+    const globalPitchSlider = document.getElementById('global-pitch');
+    const globalPitchLabel = document.getElementById('global-pitch-label');
 
     const NOTE_NAMES = ["Do (C)", "Do# (C#)", "Re (D)", "Re# (D#)", "Mi (E)", "Fa (F)", "Fa# (F#)", "Sol (G)", "Sol# (G#)", "La (A)", "La# (A#)", "Si (B)"];
 
-    // SISTEMA MEJORADO: Crea un procesador de Pitch Shifter nativo modular sin alterar velocidad
     function configurarPitchShifterDePista(context, sourceNode, outputNode) {
         const delayNode = context.createDelay(1.0);
         const gainMod = context.createGain();
@@ -272,9 +306,8 @@
         
         delayNode.delayTime.value = 0.0;
         oscillator.type = 'sawtooth';
-        oscillator.frequency.value = 20; // Frecuencia de grano de modulación (Hz)
+        oscillator.frequency.value = 20; 
 
-        // Configuración de la profundidad de modulación por delay
         gainMod.gain.value = 0.0; 
 
         oscillator.connect(gainMod);
@@ -290,8 +323,6 @@
                 if (semitonos === 0) {
                     gainMod.gain.value = 0.0;
                 } else {
-                    // Mapeo matemático estable de semitono a retraso de fase espectral
-                    // Mantiene el tempo original estricto del archivo de audio
                     let ratio = Math.pow(2, semitonos / 12);
                     let delayTimeValue = (1.0 - ratio) / oscillator.frequency.value;
                     gainMod.gain.value = Math.max(-0.05, Math.min(0.05, delayTimeValue));
@@ -299,6 +330,21 @@
             }
         };
     }
+
+    // ESCUCHAR EL DESLIZADOR GENERAL
+    globalPitchSlider.addEventListener('input', function(e) {
+        globalPitchShift = parseInt(e.target.value);
+        
+        let sign = globalPitchShift > 0 ? "+" : "";
+        globalPitchLabel.innerText = globalPitchShift === 0 ? "Original" : `${sign}${globalPitchShift} sem`;
+        
+        // Actualizar todas las pistas sumando el tono general con el suyo propio
+        audioTracks.forEach(track => {
+            const trackSlider = document.querySelector(`.pitch-slider[data-id="${track.id}"]`);
+            const localPitch = trackSlider ? parseInt(trackSlider.value) : 0;
+            track.shifter.setPitchSemitones(localPitch + globalPitchShift);
+        });
+    });
 
     fileInput.addEventListener('change', function(e) {
         const files = Array.from(e.target.files);
@@ -331,9 +377,11 @@
             const analyser = audioCtx.createAnalyser();
             analyser.fftSize = 256; 
 
-            // Conectamos el Shifter independiente entre la fuente y el mezclador
             const shifter = configurarPitchShifterDePista(audioCtx, source, gainNode);
             
+            // Si ya hay un tono general configurado, lo aplicamos de inmediato al cargar la pista
+            shifter.setPitchSemitones(globalPitchShift);
+
             gainNode.connect(analyser);
             analyser.connect(audioCtx.destination);
 
@@ -387,7 +435,7 @@
 
                 <div class="control-row">
                     <div class="control-group">
-                        <label>Cambiar Tono</label>
+                        <label>Tono Individual</label>
                         <input type="range" class="pitch-slider" data-id="${trackId}" min="-6" max="6" step="1" value="0">
                         <span class="value-indicator" id="pitchlabel-${trackId}">Original</span>
                     </div>
@@ -401,7 +449,7 @@
             generarFormaDeOndaYDetectarTono(file, canvas, trackId);
             activarVuMeter(trackId, analyser, audio);
 
-            const waveContainer = document.getElementById(`wave-container-${trackId}`);
+            const waveContainer = document.getElementById('wave-container-' + trackId);
             waveContainer.addEventListener('click', function(event) {
                 if (audioTracks.length === 0) return;
                 const rect = waveContainer.getBoundingClientRect();
@@ -529,15 +577,15 @@
             document.getElementById(`vollabel-${id}`).innerText = `${Math.round(vol * 100)}%`;
         }
 
-        // CONTROL DE TONO SIN TOCAR EL TEMPO/VELOCIDAD
+        // CAMBIO DE TONO INDIVIDUAL (Suma el tono local + el tono global)
         if (e.target.classList.contains('pitch-slider')) {
-            const semitonos = parseInt(e.target.value);
+            const semitonosLocales = parseInt(e.target.value);
             
-            // Llama a la función correctora de fase
-            track.shifter.setPitchSemitones(semitonos);
+            // Aplicar la suma de ambos mundos
+            track.shifter.setPitchSemitones(semitonosLocales + globalPitchShift);
             
-            let sign = semitonos > 0 ? "+" : "";
-            document.getElementById(`pitchlabel-${id}`).innerText = semitonos === 0 ? "Original" : `${sign}${semitonos} sem`;
+            let sign = semitonosLocales > 0 ? "+" : "";
+            document.getElementById(`pitchlabel-${id}`).innerText = semitonosLocales === 0 ? "Original" : `${sign}${semitonosLocales} sem`;
         }
     });
 
@@ -671,7 +719,6 @@
         }
     });
 
-    // FIX: "hayAlguienEnSolo" corregido sin espacios intermedios
     function actualizarMezcla() {
         const hayAlguienEnSolo = audioTracks.some(t => t.isSolo);
         audioTracks.forEach(track => {
