@@ -3,15 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mezclador Multipista Pro (Pitch Shifter Real)</title>
-    
+    <title>Mezclador Multipista Pro VU METER</title>
     <style>
         :root {
             --bg-color: #121212;
             --card-color: #1e1e1e;
             --text-color: #ffffff;
             --accent-color: #00adb5;
-            --global-accent: #ff9f43;
         }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -24,7 +22,7 @@
             align-items: center;
         }
         .container {
-            max-width: 700px;
+            max-width: 650px;
             width: 100%;
             background: var(--card-color);
             padding: 20px;
@@ -32,15 +30,9 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
             box-sizing: border-box;
         }
+        h1 { text-align: center; color: var(--accent-color); margin-top: 0; }
         
-        .app-header {
-            text-align: center;
-            margin-bottom: 20px;
-            border-bottom: 1px solid #333;
-            padding-bottom: 10px;
-        }
-        h1 { color: var(--accent-color); margin: 0; font-size: 1.6rem; }
-
+        /* Zona de carga */
         .upload-section {
             border: 2px dashed #444;
             padding: 20px;
@@ -60,23 +52,7 @@
         }
         #file-input { display: none; }
 
-        .global-pitch-container {
-            background: #222831;
-            border: 1px solid var(--global-accent);
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-        .global-pitch-title {
-            margin: 0 0 10px 0;
-            font-size: 1em;
-            color: var(--global-accent);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            font-weight: bold;
-            text-align: center;
-        }
-
+        /* Controles Globales */
         .global-controls {
             display: flex;
             justify-content: center;
@@ -96,7 +72,7 @@
         }
         button:active { transform: scale(0.95); }
         .btn-main { background-color: var(--accent-color); color: #121212; }
-        button.active-solo { background-color: #ff9f43; color: white; }
+        button.active-solo { background-color: #ff5722; color: white; }
         button.active-mute { background-color: #d32f2f; color: white; }
         
         button.btn-delete {
@@ -106,12 +82,15 @@
             border-radius: 5px;
             font-size: 0.85em;
         }
+        button.btn-delete:hover { background-color: #d32f2f; color: white; }
         
+        /* Timeline */
         .timeline-container {
             background: #252525;
             padding: 15px;
             border-radius: 8px;
             margin-bottom: 25px;
+            border-bottom: 1px solid #333;
         }
         .timeline-slider {
             width: 100%;
@@ -127,6 +106,7 @@
             font-family: monospace;
         }
 
+        /* Pistas individuales */
         .track {
             background: #282828;
             padding: 15px;
@@ -150,7 +130,8 @@
             flex-grow: 1;
         }
         .track-title-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
+        
+        /* Área visual: Vúmetro + Onda Estática */
         .visual-area {
             display: flex;
             gap: 8px;
@@ -158,6 +139,7 @@
             height: 60px;
         }
         
+        /* Contenedor del Vúmetro (VU Meter) vertical */
         .vu-meter-container {
             width: 12px;
             height: 100%;
@@ -168,10 +150,15 @@
         }
         .vu-bar {
             position: absolute;
-            bottom: 0; left: 0; width: 100%; height: 0%; 
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 0%; /* Cambia dinámicamente con el audio */
             background: linear-gradient(to top, #2ecc71 0%, #2ecc71 70%, #f1c40f 70%, #f1c40f 85%, #e74c3c 85%, #e74c3c 100%);
+            transition: height 0.05s ease;
         }
 
+        /* Contenedor de la Forma de Onda Completa */
         .waveform-container {
             position: relative;
             flex-grow: 1;
@@ -181,58 +168,36 @@
             overflow: hidden;
             cursor: pointer;
         }
-        .waveform-canvas { width: 100%; height: 100%; display: block; }
+        .waveform-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
         .playhead-line {
             position: absolute;
-            top: 0; left: 0; width: 2px; height: 100%;
+            top: 0;
+            left: 0;
+            width: 2px;
+            height: 100%;
             background-color: #ff5722;
             pointer-events: none;
+            box-shadow: 0 0 4px #ff5722;
         }
 
-        .control-row {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            margin-top: 10px;
-            background: #202020;
-            padding: 8px 12px;
-            border-radius: 6px;
-        }
-        .control-group {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-grow: 1;
-        }
-        .control-group label { font-size: 0.85em; color: #aaa; min-width: 90px; }
-        .vol-slider, .pitch-slider, .global-pitch-slider { flex-grow: 1; accent-color: var(--accent-color); cursor: pointer; }
-        .global-pitch-slider { accent-color: var(--global-accent); }
-        .value-indicator { font-size: 0.85em; font-family: monospace; min-width: 50px; text-align: right; }
-        .track-buttons { display: flex; gap: 8px; }
+        .track-controls { display: flex; align-items: center; gap: 10px; }
+        .vol-slider { flex-grow: 1; accent-color: var(--accent-color); }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div class="app-header">
-        <h1>Mezclador Multipista Pro (Pitch Real / Tempo Fijo)</h1>
-    </div>
+    <h1>Mi Mezclador Pro Audio VU</h1>
     
     <div class="upload-section">
-        <label for="file-input" class="file-input-label">📁 Seleccionar Audios</label>
+        <p style="margin-top:0;">Selecciona tus pistas de audio a la vez</p>
+        <label for="file-input" class="file-input-label">📁 Cargar Pistas</label>
         <input type="file" id="file-input" accept="audio/*" multiple>
-        <div id="file-count" style="font-size: 0.85em; margin-top: 10px; color: #888;">0 pistas activas</div>
-    </div>
-
-    <div class="global-pitch-container">
-        <div class="global-pitch-title">🎛️ Modificador de Tono General (Velocidad Constante)</div>
-        <div class="control-row" style="background: #1a1f29;">
-            <div class="control-group">
-                <label style="color: #ff9f43; font-weight: bold;">Tono Maestro</label>
-                <input type="range" id="global-pitch" class="global-pitch-slider" min="-6" max="6" step="1" value="0">
-                <span class="value-indicator" id="global-pitch-label" style="color: #ff9f43; font-weight: bold;">Original</span>
-            </div>
-        </div>
+        <div id="file-count" style="font-size: 0.85em; margin-top: 10px; color: #aaa;">Ninguna pista cargada</div>
     </div>
 
     <div class="global-controls">
@@ -260,7 +225,6 @@
     let userIsSeeking = false; 
     let trackCounter = 0; 
     let audioCtx = null; 
-    let globalPitchShift = 0; 
 
     const fileInput = document.getElementById('file-input');
     const container = document.getElementById('tracks-container');
@@ -268,104 +232,39 @@
     const timeline = document.getElementById('timeline');
     const timeCurrentLabel = document.getElementById('time-current');
     const timeTotalLabel = document.getElementById('time-total');
-    const globalPitchSlider = document.getElementById('global-pitch');
-    const globalPitchLabel = document.getElementById('global-pitch-label');
-
-    // CLAVE TÉCNICA: Nodo Pitch Shifter integrado que corre de forma nativa sin librerías externas
-    function crearPitchShifterNode(context) {
-        const bufferSize = 2048;
-        const node = context.createScriptProcessor(bufferSize, 2, 2);
-        
-        node.pitchRatio = 1.0;
-        
-        // Memoria interna para el entrelazado y superposición de ondas (Overlap and Add)
-        let fannyBufferInput = new Float32Array(bufferSize * 2);
-        let fannyBufferOutput = new Float32Array(bufferSize * 2);
-
-        node.onaudioprocess = function(e) {
-            const inputBuffer = e.inputBuffer;
-            const outputBuffer = e.outputBuffer;
-            
-            const ratio = node.pitchRatio;
-
-            for (let channel = 0; channel < inputBuffer.numberOfChannels; channel++) {
-                const inputData = inputBuffer.getChannelData(channel);
-                const outputData = outputBuffer.getChannelData(channel);
-
-                if (ratio === 1.0) {
-                    outputData.set(inputData);
-                    continue;
-                }
-
-                // Algoritmo matemático para remuestrear el tono sin mover el puntero de tiempo global
-                for (let i = 0; i < bufferSize; i++) {
-                    let punteroMuestra = i * ratio;
-                    let base = Math.floor(punteroMuestra);
-                    let fraccion = punteroMuestra - base;
-
-                    if (base + 1 < bufferSize) {
-                        // Interpolación lineal limpia para evitar crujidos en el tono
-                        outputData[i] = inputData[base] * (1 - fraccion) + inputData[base + 1] * fraccion;
-                    } else {
-                        outputData[i] = inputData[i];
-                    }
-                }
-            }
-        };
-
-        return node;
-    }
-
-    function calcularFactorPitch(semitonos) {
-        return Math.pow(2, semitonos / 12);
-    }
-
-    globalPitchSlider.addEventListener('input', function(e) {
-        globalPitchShift = parseInt(e.target.value);
-        let sign = globalPitchShift > 0 ? "+" : "";
-        globalPitchLabel.innerText = globalPitchShift === 0 ? "Original" : `${sign}${globalPitchShift} sem`;
-        
-        audioTracks.forEach(track => {
-            const trackSlider = document.querySelector(`.pitch-slider[data-id="${track.id}"]`);
-            const localPitch = trackSlider ? parseInt(trackSlider.value) : 0;
-            track.shifterNode.pitchRatio = calcularFactorPitch(localPitch + globalPitchShift);
-        });
-    });
 
     fileInput.addEventListener('change', function(e) {
-        const files = Array.from(e.target.files);
+        const files = e.target.files;
         if (files.length === 0) return;
 
-        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
 
-        files.forEach((file) => {
+        Array.from(files).forEach((file) => {
             trackCounter++;
             const trackId = `track-${trackCounter}`;
             const fileURL = URL.createObjectURL(file);
             const audio = new Audio(fileURL);
             audio.loop = true;
             audio.crossOrigin = "anonymous";
-            
-            // Forzamos a que el archivo maestro corra exactamente a 1.0 siempre
-            audio.playbackRate = 1.0;
 
             if (audioTracks.length === 0) {
-                audio.addEventListener('loadedmetadata', () => actualizarDuracionGlobal());
+                audio.addEventListener('loadedmetadata', () => {
+                    actualizarDuracionGlobal();
+                });
             }
 
+            if (isPlaying && audioTracks.length > 0) {
+                audio.currentTime = audioTracks[0].audioElement.currentTime;
+                audio.play().catch(e => {});
+            }
+
+            // ANALIZADOR EN TIEMPO REAL: Para medir los picos de volumen (Vúmetro)
             const source = audioCtx.createMediaElementSource(audio);
-            const gainNode = audioCtx.createGain();
             const analyser = audioCtx.createAnalyser();
-            analyser.fftSize = 256; 
-
-            // Creamos nuestro procesador nativo de Pitch
-            const shifterNode = crearPitchShifterNode(audioCtx);
-            shifterNode.pitchRatio = calcularFactorPitch(globalPitchShift);
-
-            // Conexión limpia de la cadena de sonido
-            source.connect(shifterNode);
-            shifterNode.connect(gainNode);
-            gainNode.connect(analyser);
+            analyser.fftSize = 32; // Tamaño pequeño para lectura rápida de volumen general
+            source.connect(analyser);
             analyser.connect(audioCtx.destination);
 
             audioTracks.push({
@@ -373,13 +272,12 @@
                 audioElement: audio,
                 objectURL: fileURL,
                 analyser: analyser,
-                gainNode: gainNode,
-                shifterNode: shifterNode,
                 isMuted: false,
-                isSolo: false
+                isSolo: false,
+                duration: 0
             });
 
-            const cleanFileName = file.name.replace(/\.[^/.]+$/, "");
+            // Interfaz de usuario con el Vúmetro (.vu-meter-container) al lado de la Onda
             const trackDiv = document.createElement('div');
             trackDiv.className = 'track';
             trackDiv.id = `node-${trackId}`;
@@ -387,39 +285,26 @@
                 <div class="track-header">
                     <div class="track-name-wrapper">
                         <button class="btn-delete" data-id="${trackId}">❌</button>
-                        <span class="track-title-text">${cleanFileName}</span>
+                        <span class="track-title-text">${file.name.replace(/\.[^/.]+$/, "")}</span>
                     </div>
+                    <span class="vol-label">100%</span>
                 </div>
                 
                 <div class="visual-area">
-                    <div class="vu-meter-container">
+                    <div class="vu-meter-container" title="Medidor de volumen en vivo">
                         <div id="vubar-${trackId}" class="vu-bar"></div>
                     </div>
+
                     <div class="waveform-container" data-id="${trackId}" id="wave-container-${trackId}">
                         <canvas id="canvas-${trackId}" class="waveform-canvas" height="60"></canvas>
                         <div id="playhead-${trackId}" class="playhead-line"></div>
                     </div>
                 </div>
 
-                <div class="track-buttons">
+                <div class="track-controls">
                     <button class="btn-mute" data-id="${trackId}">Mute</button>
                     <button class="btn-solo" data-id="${trackId}">Solo</button>
-                </div>
-
-                <div class="control-row">
-                    <div class="control-group">
-                        <label>Volumen</label>
-                        <input type="range" class="vol-slider" data-id="${trackId}" min="0" max="1" step="0.01" value="1">
-                        <span class="value-indicator" id="vollabel-${trackId}">100%</span>
-                    </div>
-                </div>
-
-                <div class="control-row">
-                    <div class="control-group">
-                        <label>Tono Individual</label>
-                        <input type="range" class="pitch-slider" data-id="${trackId}" min="-6" max="6" step="1" value="0">
-                        <span class="value-indicator" id="pitchlabel-${trackId}">Original</span>
-                    </div>
+                    <input type="range" class="vol-slider" data-id="${trackId}" min="0" max="1" step="0.01" value="1">
                 </div>
             `;
             container.appendChild(trackDiv);
@@ -427,20 +312,85 @@
             const canvas = document.getElementById(`canvas-${trackId}`);
             canvas.width = canvas.offsetWidth;
 
-            generarFormaDeOnda(file, canvas, trackId);
+            // Dibujar aviso de carga inicial en la onda
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#151515';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#666';
+            ctx.font = '11px sans-serif';
+            ctx.fillText('Cargando mapa...', 10, 35);
+
+            // Generar la silueta estática
+            generarFormaDeOndaEstatica(file, canvas, trackId);
+
+            // Escuchar el volumen en tiempo real para mover el Vúmetro
             activarVuMeter(trackId, analyser, audio);
+
+            // Clic en la onda para saltar de segundo
+            const waveContainer = document.getElementById(`wave-container-${trackId}`);
+            waveContainer.addEventListener('click', function(event) {
+                if (audioTracks.length === 0) return;
+                const rect = waveContainer.getBoundingClientRect();
+                const clickX = event.clientX - rect.left;
+                const porcentaje = clickX / rect.width;
+                const totalDuration = audioTracks[0].audioElement.duration || audio.duration;
+                
+                if (totalDuration) {
+                    sincronizarTiempoA(totalDuration * porcentaje);
+                }
+            });
         });
 
         actualizarContadorEtiqueta();
         actualizarMezcla(); 
     });
 
-    function generarFormaDeOnda(file, canvas, trackId) {
+    // LÓGICA DEL VÚMETRO: Lee la potencia del volumen actual constantemente
+    function activarVuMeter(trackId, analyser, audio) {
+        const vuBar = document.getElementById(`vubar-${trackId}`);
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+        function actualizar() {
+            // Si la pista se elimina, detenemos el ciclo
+            if (!document.getElementById(`vubar-${trackId}`)) return;
+
+            requestAnimationFrame(actualizar);
+
+            // Solo calcular volumen si la app le dio PLAY y la pista no está muteada internamente
+            if (isPlaying && !audio.muted) {
+                analyser.getByteFrequencyData(dataArray);
+                
+                // Obtener el promedio de potencia de todas las frecuencias en este instante
+                let total = 0;
+                for (let i = 0; i < dataArray.length; i++) {
+                    total += dataArray[i];
+                }
+                let promedio = total / dataArray.length;
+                
+                // Convertir a porcentaje (0 a 100%)
+                let porcentajeVolumen = (promedio / 160) * 100; // 160 equilibra la sensibilidad en dispositivos móviles
+                if (porcentajeVolumen > 100) porcentajeVolumen = 100;
+
+                vuBar.style.height = `${porcentajeVolumen}%`;
+            } else {
+                // Si está en pausa o mute, el vúmetro cae inmediatamente a 0
+                vuBar.style.height = '0%';
+            }
+        }
+        actualizar();
+    }
+
+    // Decodifica el audio completo para dibujar el fondo estático
+    function generarFormaDeOndaEstatica(file, canvas, trackId) {
         const reader = new FileReader();
         reader.onload = function(e) {
             const arrayBuffer = e.target.result;
             const offlineCtx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 44100, 44100);
+            
             offlineCtx.decodeAudioData(arrayBuffer).then(audioBuffer => {
+                const track = audioTracks.find(t => t.id === trackId);
+                if (track) track.duration = audioBuffer.duration;
+
                 const ctx = canvas.getContext('2d');
                 const rawData = audioBuffer.getChannelData(0);
                 const width = canvas.width;
@@ -451,14 +401,18 @@
                 for (let i = 0; i < width; i++) {
                     let blockStart = blockSize * i;
                     let sum = 0;
-                    for (let j = 0; j < blockSize; j++) sum += Math.abs(rawData[blockStart + j]);
+                    for (let j = 0; j < blockSize; j++) {
+                        sum += Math.abs(rawData[blockStart + j]);
+                    }
                     filteredData.push(sum / blockSize);
                 }
 
                 const multiplier = Math.max(...filteredData) || 1;
+                
                 ctx.clearRect(0, 0, width, height);
                 ctx.fillStyle = '#151515';
                 ctx.fillRect(0, 0, width, height);
+
                 ctx.fillStyle = '#00adb5'; 
 
                 for (let i = 0; i < width; i++) {
@@ -467,63 +421,22 @@
                     const y = (height - h) / 2;
                     ctx.fillRect(i, y, 1.5, h);
                 }
+            }).catch(err => {
+                console.error(err);
             });
         };
         reader.readAsArrayBuffer(file);
     }
 
-    function activarVuMeter(trackId, analyser, audio) {
-        const vuBar = document.getElementById(`vubar-${trackId}`);
-        const dataArray = new Uint8Array(analyser.frequencyBinCount);
-
-        function actualizar() {
-            if (!document.getElementById(`vubar-${trackId}`)) return;
-            requestAnimationFrame(actualizar);
-
-            if (isPlaying && !audio.muted) {
-                analyser.getByteFrequencyData(dataArray);
-                let total = 0;
-                for (let i = 0; i < dataArray.length; i++) total += dataArray[i];
-                let promedio = total / dataArray.length;
-                let porcentajeVolumen = (promedio / 140) * 100; 
-                vuBar.style.height = `${Math.min(porcentajeVolumen, 100)}%`;
-            } else {
-                vuBar.style.height = '0%';
-            }
-        }
-        actualizar();
-    }
-
-    container.addEventListener('input', (e) => {
-        const id = e.target.dataset.id;
-        if (!id) return;
-        const track = audioTracks.find(t => t.id === id);
-        if (!track) return;
-
-        if (e.target.classList.contains('vol-slider')) {
-            const vol = e.target.value;
-            track.gainNode.gain.value = vol; 
-            document.getElementById(`vollabel-${id}`).innerText = `${Math.round(vol * 100)}%`;
-        }
-
-        if (e.target.classList.contains('pitch-slider')) {
-            const semitonosLocales = parseInt(e.target.value);
-            track.shifterNode.pitchRatio = calcularFactorPitch(semitonosLocales + globalPitchShift);
-            
-            let sign = semitonosLocales > 0 ? "+" : "";
-            document.getElementById(`pitchlabel-${id}`).innerText = semitonosLocales === 0 ? "Original" : `${sign}${semitonosLocales} sem`;
-        }
-    });
-
     function actualizarContadorEtiqueta() {
         if (audioTracks.length === 0) {
-            fileCountLabel.innerText = "0 pistas activas";
+            fileCountLabel.innerText = "Ninguna pista cargada";
             timeline.disabled = true;
             timeline.value = 0;
             timeCurrentLabel.innerText = "00:00";
             timeTotalLabel.innerText = "00:00";
         } else {
-            fileCountLabel.innerText = `${audioTracks.length} pista(s) cargada(s).`;
+            fileCountLabel.innerText = `${audioTracks.length} pista(s) activa(s) en la mezcla.`;
             actualizarDuracionGlobal();
         }
     }
@@ -539,14 +452,17 @@
         }
     }
 
+    // Reloj e indicador de progreso rojo de la línea de tiempo
     setInterval(() => {
         if (audioTracks.length > 0 && !userIsSeeking) {
             const current = audioTracks[0].audioElement.currentTime;
             const duration = audioTracks[0].audioElement.duration;
+            
             if (isPlaying) {
                 timeline.value = current;
                 timeCurrentLabel.innerText = formatTime(current);
             }
+
             if (duration > 0) {
                 const porcentaje = (current / duration) * 100;
                 audioTracks.forEach(track => {
@@ -557,9 +473,12 @@
         }
     }, 100);
 
+    // Controles globales
     document.getElementById('btn-play').addEventListener('click', () => {
         if (audioTracks.length === 0) return;
-        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
         if (isPlaying) return;
         isPlaying = true;
         audioTracks.forEach(track => track.audioElement.play().catch(e => {}));
@@ -583,13 +502,15 @@
     document.getElementById('btn-forward').addEventListener('click', () => {
         if (audioTracks.length === 0) return;
         let targetTime = audioTracks[0].audioElement.currentTime + 10;
+        if (targetTime > audioTracks[0].audioElement.duration) targetTime = audioTracks[0].audioElement.duration;
         sincronizarTiempoA(targetTime);
     });
 
     document.getElementById('btn-rewind').addEventListener('click', () => {
         if (audioTracks.length === 0) return;
         let targetTime = audioTracks[0].audioElement.currentTime - 10;
-        sincronizarTiempoA(targetTime < 0 ? 0 : targetTime);
+        if (targetTime < 0) targetTime = 0;
+        sincronizarTiempoA(targetTime);
     });
 
     timeline.addEventListener('input', () => {
@@ -598,16 +519,44 @@
     });
 
     timeline.addEventListener('change', () => {
-        sincronizarTiempoA(parseFloat(timeline.value));
+        const nuevoTiempo = parseFloat(timeline.value);
+        sincronizarTiempoA(nuevoTiempo);
         userIsSeeking = false;
     });
 
     function sincronizarTiempoA(segundos) {
-        audioTracks.forEach(track => track.audioElement.currentTime = segundos);
+        audioTracks.forEach(track => {
+            track.audioElement.currentTime = segundos;
+        });
         timeline.value = segundos;
         timeCurrentLabel.innerText = formatTime(segundos);
+        
+        if (audioTracks.length > 0) {
+            const duration = audioTracks[0].audioElement.duration;
+            if (duration > 0) {
+                const porcentaje = (segundos / duration) * 100;
+                audioTracks.forEach(track => {
+                    const head = document.getElementById(`playhead-${track.id}`);
+                    if (head) head.style.left = `${porcentaje}%`;
+                });
+            }
+        }
     }
 
+    // Control de volumen individual
+    container.addEventListener('input', (e) => {
+        if (e.target.classList.contains('vol-slider')) {
+            const id = e.target.dataset.id;
+            const vol = e.target.value;
+            const track = audioTracks.find(t => t.id === id);
+            if (track) {
+                track.audioElement.volume = vol;
+                e.target.closest('.track').querySelector('.vol-label').innerText = `${Math.round(vol * 100)}%`;
+            }
+        }
+    });
+
+    // Clicks en Mute, Solo o Eliminar
     container.addEventListener('click', (e) => {
         const id = e.target.dataset.id;
         if (!id) return;
@@ -618,7 +567,9 @@
                 audioTracks[index].audioElement.pause();
                 URL.revokeObjectURL(audioTracks[index].objectURL);
                 audioTracks.splice(index, 1);
-                document.getElementById(`node-${id}`).remove();
+                const trackNode = document.getElementById(`node-${id}`);
+                if (trackNode) trackNode.remove();
+                
                 actualizarContadorEtiqueta();
                 actualizarMezcla();
             }
@@ -650,7 +601,9 @@
             } else {
                 track.audioElement.muted = track.isMuted;
             }
-            if (canvas) canvas.style.opacity = track.audioElement.muted ? "0.25" : "1";
+            if (canvas) {
+                canvas.style.opacity = track.audioElement.muted ? "0.25" : "1";
+            }
         });
     }
 
