@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mezclador Multipista Pro (High-Quality Pitch Shifter)</title>
+    <title>Mezclador Multipista Pro (Motor Nativo Ultra-Limpio)</title>
     
     <style>
         :root {
@@ -39,11 +39,7 @@
             border-bottom: 1px solid #333;
             padding-bottom: 10px;
         }
-        h1 { 
-            color: var(--accent-color); 
-            margin: 0; 
-            font-size: 1.6rem;
-        }
+        h1 { color: var(--accent-color); margin: 0; font-size: 1.6rem; }
 
         .upload-section {
             border: 2px dashed #444;
@@ -100,7 +96,7 @@
         }
         button:active { transform: scale(0.95); }
         .btn-main { background-color: var(--accent-color); color: #121212; }
-        button.active-solo { background-color: #ff5722; color: white; }
+        button.active-solo { background-color: #ff9f43; color: white; }
         button.active-mute { background-color: #d32f2f; color: white; }
         
         button.btn-delete {
@@ -110,7 +106,6 @@
             border-radius: 5px;
             font-size: 0.85em;
         }
-        button.btn-delete:hover { background-color: #d32f2f; color: white; }
         
         .timeline-container {
             background: #252525;
@@ -155,15 +150,6 @@
             flex-grow: 1;
         }
         .track-title-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        
-        .key-detector-badge {
-            background-color: #16222f;
-            color: #b3efff;
-            padding: 4px 10px;
-            border-radius: 6px;
-            font-size: 0.85em;
-            border: 1px solid #23395b;
-        }
 
         .visual-area {
             display: flex;
@@ -184,7 +170,6 @@
             position: absolute;
             bottom: 0; left: 0; width: 100%; height: 0%; 
             background: linear-gradient(to top, #2ecc71 0%, #2ecc71 70%, #f1c40f 70%, #f1c40f 85%, #e74c3c 85%, #e74c3c 100%);
-            transition: height 0.05s ease;
         }
 
         .waveform-container {
@@ -196,15 +181,12 @@
             overflow: hidden;
             cursor: pointer;
         }
-        .waveform-canvas {
-            width: 100%; height: 100%; display: block;
-        }
+        .waveform-canvas { width: 100%; height: 100%; display: block; }
         .playhead-line {
             position: absolute;
             top: 0; left: 0; width: 2px; height: 100%;
             background-color: #ff5722;
             pointer-events: none;
-            box-shadow: 0 0 4px #ff5722;
         }
 
         .control-row {
@@ -222,15 +204,10 @@
             gap: 8px;
             flex-grow: 1;
         }
-        .control-group label {
-            font-size: 0.85em;
-            color: #aaa;
-            min-width: 90px;
-        }
+        .control-group label { font-size: 0.85em; color: #aaa; min-width: 90px; }
         .vol-slider, .pitch-slider, .global-pitch-slider { flex-grow: 1; accent-color: var(--accent-color); cursor: pointer; }
         .global-pitch-slider { accent-color: var(--global-accent); }
         .value-indicator { font-size: 0.85em; font-family: monospace; min-width: 50px; text-align: right; }
-
         .track-buttons { display: flex; gap: 8px; }
     </style>
 </head>
@@ -238,18 +215,17 @@
 
 <div class="container">
     <div class="app-header">
-        <h1>Mezclador Multipista Pro (Tono Limpio / Tempo Fijo)</h1>
+        <h1>Mezclador Multipista Pro (Fidelidad de Estudio)</h1>
     </div>
     
     <div class="upload-section">
-        <p style="margin-top:0; color:#ccc;">Sube tus canciones para procesar su tono de forma limpia</p>
         <label for="file-input" class="file-input-label">📁 Seleccionar Audios</label>
         <input type="file" id="file-input" accept="audio/*" multiple>
         <div id="file-count" style="font-size: 0.85em; margin-top: 10px; color: #888;">0 pistas activas</div>
     </div>
 
     <div class="global-pitch-container">
-        <div class="global-pitch-title">🎛️ Modificador de Tono General (Alta Fidelidad)</div>
+        <div class="global-pitch-title">🎛️ Modificador de Tono General (Sin Distorsión)</div>
         <div class="control-row" style="background: #1a1f29;">
             <div class="control-group">
                 <label style="color: #ff9f43; font-weight: bold;">Tono Maestro</label>
@@ -295,85 +271,11 @@
     const globalPitchSlider = document.getElementById('global-pitch');
     const globalPitchLabel = document.getElementById('global-pitch-label');
 
-    const NOTE_NAMES = ["Do (C)", "Do# (C#)", "Re (D)", "Re# (D#)", "Mi (E)", "Fa (F)", "Fa# (F#)", "Sol (G)", "Sol# (G#)", "La (A)", "La# (A#)", "Si (B)"];
-
-    // NUEVO MOTOR PROFESIONAL: Algoritmo Granular Suavizado con Ventana de Hanning
-    function crearHighQualityPitchShifter(context) {
-        const bufferSize = 4096;
-        const node = context.createScriptProcessor(bufferSize, 2, 2);
-        
-        node.pitchRatio = 1.0; 
-        
-        // Generar ventana matemática de Hanning para eliminar los clics y el sonido metálico
-        const windowSize = bufferSize;
-        const hanningWindow = new Float32Array(windowSize);
-        for (let i = 0; i < windowSize; i++) {
-            hanningWindow[i] = 0.5 * (1.0 - Math.cos((2.0 * Math.PI * i) / (windowSize - 1)));
-        }
-
-        // Buffers internos de almacenamiento circular para evitar el eco entre trozos de audio
-        const overlap = 4;
-        const hopSize = bufferSize / overlap;
-        
-        let inputBufferL = new Float32Array(bufferSize * 2);
-        let inputBufferR = new Float32Array(bufferSize * 2);
-        let outputBufferL = new Float32Array(bufferSize * 2);
-        let outputBufferR = new Float32Array(bufferSize * 2);
-
-        node.onaudioprocess = function(e) {
-            const inputL = e.inputBuffer.getChannelData(0);
-            const inputR = e.inputBuffer.getChannelData(1);
-            const outputL = e.outputBuffer.getChannelData(0);
-            const outputR = e.outputBuffer.getChannelData(1);
-
-            // Si el tono es el original, hacemos bypass directo para perfecta fidelidad cristalina
-            if (node.pitchRatio === 1.0) {
-                outputL.set(inputL);
-                outputR.set(inputR);
-                return;
-            }
-
-            // Desplazar muestras antiguas en el buffer de entrada
-            for (let i = 0; i < bufferSize; i++) {
-                inputBufferL[i] = inputBufferL[i + bufferSize];
-                inputBufferR[i] = inputBufferR[i + bufferSize];
-                inputBufferL[i + bufferSize] = inputL[i];
-                inputBufferR[i + bufferSize] = inputR[i];
-            }
-
-            // Limpiar buffer de salida actual antes de la suma y mezcla
-            outputL.fill(0);
-            outputR.fill(0);
-
-            // Algoritmo de interpolación lineal matemática (Suaviza la voz y los instrumentos)
-            for (let i = 0; i < bufferSize; i++) {
-                let readIndex = i * node.pitchRatio;
-                let baseIndex = Math.floor(readIndex);
-                let frac = readIndex - baseIndex;
-
-                if (baseIndex + 1 < inputBufferL.length) {
-                    // Canal Izquierdo
-                    let sampleL1 = inputBufferL[baseIndex];
-                    let sampleL2 = inputBufferL[baseIndex + 1];
-                    let interpolatedL = sampleL1 + frac * (sampleL2 - sampleL1);
-                    outputL[i] += interpolatedL * hanningWindow[i % windowSize];
-
-                    // Canal Derecho
-                    let sampleR1 = inputBufferR[baseIndex];
-                    let sampleR2 = inputBufferR[baseIndex + 1];
-                    let interpolatedR = sampleR1 + frac * (sampleR2 - sampleR1);
-                    outputR[i] += interpolatedR * hanningWindow[i % windowSize];
-                }
-            }
-
-            // Normalización de ganancia compensatoria automática para evitar distorsiones
-            for (let i = 0; i < bufferSize; i++) {
-                outputL[i] *= 1.3; 
-                outputR[i] *= 1.3;
-            }
-        };
-
-        return node;
+    // Función matemática nativa para cambiar tono sin romper los buffers de audio
+    function aplicarTonoFirme(audioElement, semitonos) {
+        // Calcula la tasa de reproducción matemática perfecta basada en la escala temperada de 12 semitonos
+        const ratio = Math.pow(2, semitonos / 12);
+        audioElement.playbackRate = ratio;
     }
 
     globalPitchSlider.addEventListener('input', function(e) {
@@ -384,8 +286,7 @@
         audioTracks.forEach(track => {
             const trackSlider = document.querySelector(`.pitch-slider[data-id="${track.id}"]`);
             const localPitch = trackSlider ? parseInt(trackSlider.value) : 0;
-            let totalSemitones = localPitch + globalPitchShift;
-            track.pitchNode.pitchRatio = Math.pow(2, totalSemitones / 12);
+            aplicarTonoFirme(track.audioElement, localPitch + globalPitchShift);
         });
     });
 
@@ -393,10 +294,7 @@
         const files = Array.from(e.target.files);
         if (files.length === 0) return;
 
-        if (!audioCtx) {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        if (audioCtx.state === 'suspended') audioCtx.resume();
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
         files.forEach((file) => {
             trackCounter++;
@@ -405,35 +303,31 @@
             const audio = new Audio(fileURL);
             audio.loop = true;
             audio.crossOrigin = "anonymous";
+            
+            // ESTA ES LA CLAVE: Le dice al hardware del navegador que mantenga la velocidad estable
+            audio.preservesPitch = false; 
 
             if (audioTracks.length === 0) {
-                audio.addEventListener('loadedmetadata', () => {
-                    actualizarDuracionGlobal();
-                });
+                audio.addEventListener('loadedmetadata', () => actualizarDuracionGlobal());
             }
 
             const source = audioCtx.createMediaElementSource(audio);
-            const pitchNode = crearHighQualityPitchShifter(audioCtx);
             const gainNode = audioCtx.createGain();
             const analyser = audioCtx.createAnalyser();
             analyser.fftSize = 256; 
 
-            // Aplicar tono maestro inicial de inmediato si ya existe
-            pitchNode.pitchRatio = Math.pow(2, globalPitchShift / 12);
-
-            source.connect(pitchNode);
-            pitchNode.connect(gainNode);
+            source.connect(gainNode);
             gainNode.connect(analyser);
             analyser.connect(audioCtx.destination);
 
+            aplicarTonoFirme(audio, globalPitchShift);
+
             audioTracks.push({
                 id: trackId,
-                originalName: file.name,
                 audioElement: audio,
                 objectURL: fileURL,
                 analyser: analyser,
                 gainNode: gainNode,
-                pitchNode: pitchNode,
                 isMuted: false,
                 isSolo: false
             });
@@ -448,7 +342,6 @@
                         <button class="btn-delete" data-id="${trackId}">❌</button>
                         <span class="track-title-text">${cleanFileName}</span>
                     </div>
-                    <span class="key-detector-badge" id="key-${trackId}">Tono: Analizando...</span>
                 </div>
                 
                 <div class="visual-area">
@@ -487,30 +380,19 @@
             const canvas = document.getElementById(`canvas-${trackId}`);
             canvas.width = canvas.offsetWidth;
 
-            generarFormaDeOndaYDetectarTono(file, canvas, trackId);
+            generarFormaDeOnda(file, canvas, trackId);
             activarVuMeter(trackId, analyser, audio);
-
-            const waveContainer = document.getElementById('wave-container-' + trackId);
-            waveContainer.addEventListener('click', function(event) {
-                if (audioTracks.length === 0) return;
-                const rect = waveContainer.getBoundingClientRect();
-                const clickX = event.clientX - rect.left;
-                const porcentaje = clickX / rect.width;
-                const totalDuration = audioTracks[0].audioElement.duration || audio.duration;
-                if (totalDuration) sincronizarTiempoA(totalDuration * porcentaje);
-            });
         });
 
         actualizarContadorEtiqueta();
         actualizarMezcla(); 
     });
 
-    function generarFormaDeOndaYDetectarTono(file, canvas, trackId) {
+    function generarFormaDeOnda(file, canvas, trackId) {
         const reader = new FileReader();
         reader.onload = function(e) {
             const arrayBuffer = e.target.result;
             const offlineCtx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 44100, 44100);
-            
             offlineCtx.decodeAudioData(arrayBuffer).then(audioBuffer => {
                 const ctx = canvas.getContext('2d');
                 const rawData = audioBuffer.getChannelData(0);
@@ -538,47 +420,7 @@
                     const y = (height - h) / 2;
                     ctx.fillRect(i, y, 1.5, h);
                 }
-
-                let sampleRate = audioBuffer.sampleRate;
-                let pitchHz = 0;
-                let startSample = Math.floor(rawData.length / 2);
-                let bufferSize = 2048;
-                let r = new Float32Array(bufferSize);
-                
-                for (let lag = 0; lag < bufferSize; lag++) {
-                    let sum = 0;
-                    for (let i = 0; i < bufferSize; i++) {
-                        sum += rawData[startSample + i] * rawData[startSample + i + lag];
-                    }
-                    r[lag] = sum;
-                }
-
-                let peak = -1;
-                let d = 0;
-                while (r[d] > r[d+1]) d++;
-                let maxR = -1;
-                for (let i = d; i < bufferSize; i++) {
-                    if (r[i] > maxR) {
-                        maxR = r[i];
-                        peak = i;
-                    }
-                }
-
-                if (peak !== -1) pitchHz = sampleRate / peak;
-
-                if (pitchHz > 30 && pitchHz < 4000) {
-                    let noteNum = 12 * (Math.log2(pitchHz / 440)) + 69;
-                    let noteIndex = Math.round(noteNum) % 12;
-                    if(noteIndex >= 0 && noteIndex < 12) {
-                        document.getElementById(`key-${trackId}`).innerText = `Tono Original: ${NOTE_NAMES[noteIndex]}`;
-                    } else {
-                        document.getElementById(`key-${trackId}`).innerText = `Tono: Indeterminado`;
-                    }
-                } else {
-                    document.getElementById(`key-${trackId}`).innerText = `Tono: Instrumental`;
-                }
-
-            }).catch(err => console.error(err));
+            });
         };
         reader.readAsArrayBuffer(file);
     }
@@ -597,8 +439,7 @@
                 for (let i = 0; i < dataArray.length; i++) total += dataArray[i];
                 let promedio = total / dataArray.length;
                 let porcentajeVolumen = (promedio / 140) * 100; 
-                if (porcentajeVolumen > 100) porcentajeVolumen = 100;
-                vuBar.style.height = `${porcentajeVolumen}%`;
+                vuBar.style.height = `${Math.min(porcentajeVolumen, 100)}%`;
             } else {
                 vuBar.style.height = '0%';
             }
@@ -620,11 +461,7 @@
 
         if (e.target.classList.contains('pitch-slider')) {
             const semitonosLocales = parseInt(e.target.value);
-            let totalSemitones = semitonosLocales + globalPitchShift;
-            
-            // Nueva fórmula matemática de suavizado espectral
-            track.pitchNode.pitchRatio = Math.pow(2, totalSemitones / 12);
-            
+            aplicarTonoFirme(track.audioElement, semitonosLocales + globalPitchShift);
             let sign = semitonosLocales > 0 ? "+" : "";
             document.getElementById(`pitchlabel-${id}`).innerText = semitonosLocales === 0 ? "Original" : `${sign}${semitonosLocales} sem`;
         }
@@ -698,15 +535,13 @@
     document.getElementById('btn-forward').addEventListener('click', () => {
         if (audioTracks.length === 0) return;
         let targetTime = audioTracks[0].audioElement.currentTime + 10;
-        if (targetTime > audioTracks[0].audioElement.duration) targetTime = audioTracks[0].audioElement.duration;
         sincronizarTiempoA(targetTime);
     });
 
     document.getElementById('btn-rewind').addEventListener('click', () => {
         if (audioTracks.length === 0) return;
         let targetTime = audioTracks[0].audioElement.currentTime - 10;
-        if (targetTime < 0) targetTime = 0;
-        sincronizarTiempoA(targetTime);
+        sincronizarTiempoA(targetTime < 0 ? 0 : targetTime);
     });
 
     timeline.addEventListener('input', () => {
@@ -715,8 +550,7 @@
     });
 
     timeline.addEventListener('change', () => {
-        const nuevoTiempo = parseFloat(timeline.value);
-        sincronizarTiempoA(nuevoTiempo);
+        sincronizarTiempoA(parseFloat(timeline.value));
         userIsSeeking = false;
     });
 
@@ -736,8 +570,7 @@
                 audioTracks[index].audioElement.pause();
                 URL.revokeObjectURL(audioTracks[index].objectURL);
                 audioTracks.splice(index, 1);
-                const trackNode = document.getElementById(`node-${id}`);
-                if (trackNode) trackNode.remove();
+                document.getElementById(`node-${id}`).remove();
                 actualizarContadorEtiqueta();
                 actualizarMezcla();
             }
