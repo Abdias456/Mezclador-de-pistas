@@ -15,7 +15,7 @@
             --bg-color: #121212;
             --card-color: #1e1e1e;
             --text-color: #ffffff;
-            --accent-color: #ef3340;
+            --accent-color: #00adb5;
         }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -43,7 +43,7 @@
             align-items: center;
             justify-content: center;
             gap: 15px;
-            margin-bottom: 25px;
+            margin-bottom: 20px;
         }
         .app-logo {
             width: 50px;
@@ -51,7 +51,6 @@
             border-radius: 10px;
             object-fit: cover;
             box-shadow: 0 2px 8px rgba(0,173,181,0.3);
-            /* Si la imagen no carga, muestra un fondo alternativo */
             background-color: var(--accent-color); 
         }
         h1 { 
@@ -60,8 +59,45 @@
             margin: 0; 
             font-size: 1.8rem;
         }
+
+        /* SECCIÓN DE PROYECTOS (NUEVA) */
+        .project-section {
+            background: #16222f;
+            border: 1px solid #23395b;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .project-section-title {
+            font-weight: bold;
+            color: #b3efff;
+            margin-top: 0;
+            margin-bottom: 5px;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .project-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .btn-project {
+            background-color: #23395b;
+            color: #b3efff;
+            font-size: 0.85em;
+            padding: 8px 12px;
+        }
+        .btn-project:hover {
+            background-color: #2c4a75;
+        }
+        #project-file-input { display: none; }
         
-        /* Zona de carga */
+        /* Zona de carga de pistas */
         .upload-section {
             border: 2px dashed #444;
             padding: 20px;
@@ -222,12 +258,22 @@
 <div class="container">
     <div class="app-header">
         <img src="logo.png" alt="Logo" class="app-logo" onerror="this.style.display='none'">
-        <h1>Mezclador Multitrack</h1>
+        <h1>Mi Mezclador Pro Audio</h1>
+    </div>
+
+    <div class="project-section">
+        <div class="project-section-title">📁 Mis Creaciones y Proyectos</div>
+        <div class="project-buttons">
+            <button id="btn-save-project" class="btn-project">💾 Guardar Proyecto (.mpro)</button>
+            <label for="project-file-input" class="btn-project" style="border-radius:20px; font-weight:bold; cursor:pointer;">📂 Cargar Proyecto</label>
+            <input type="file" id="project-file-input" accept=".mpro">
+        </div>
+        <div id="project-status" style="font-size: 0.8em; color: #a5c4d4; display:none;"></div>
     </div>
     
     <div class="upload-section">
-        <p style="margin-top:0;">Selecciona tus pistas de audio a la vez</p>
-        <label for="file-input" class="file-input-label">📁 Cargar Pistas</label>
+        <p style="margin-top:0;" id="upload-instruction">Selecciona tus pistas de audio a la vez</p>
+        <label for="file-input" class="file-input-label" id="btn-upload-label">📁 Cargar Pistas</label>
         <input type="file" id="file-input" accept="audio/*" multiple>
         <div id="file-count" style="font-size: 0.85em; margin-top: 10px; color: #aaa;">Ninguna pista cargada</div>
     </div>
@@ -257,6 +303,7 @@
     let userIsSeeking = false; 
     let trackCounter = 0; 
     let audioCtx = null; 
+    let proyectoCargadoPendiente = null; // Almacena temporalmente la configuración de un .mpro importado
 
     const fileInput = document.getElementById('file-input');
     const container = document.getElementById('tracks-container');
@@ -264,16 +311,113 @@
     const timeline = document.getElementById('timeline');
     const timeCurrentLabel = document.getElementById('time-current');
     const timeTotalLabel = document.getElementById('time-total');
+    const projectFileInput = document.getElementById('project-file-input');
+    const projectStatus = document.getElementById('project-status');
+    const uploadInstruction = document.getElementById('upload-instruction');
+    const btnUploadLabel = document.getElementById('btn-upload-label');
 
+    // NUEVA FUNCIÓN: Guardar toda la configuración actual de la mezcla a un archivo externo
+    document.getElementById('btn-save-project').addEventListener('click', () => {
+        if (audioTracks.length === 0) {
+            alert("No tienes ninguna pista cargada para guardar en tu proyecto.");
+            return;
+        }
+
+        // Mapeamos solo las variables importantes del estado actual de la mezcla
+        const datosProyecto = audioTracks.map(track => {
+            const trackNode = document.getElementById(`node-${track.id}`);
+            const volInput = trackNode ? trackNode.querySelector('.vol-slider') : null;
+            return {
+                fileName: track.originalName,
+                volume: volInput ? parseFloat(volInput.value) : track.audioElement.volume,
+                isMuted: track.isMuted,
+                isSolo: track.isSolo
+            };
+        });
+
+        const contenidoTexto = JSON.stringify(datosProyecto, null, 2);
+        const blob = new Blob([contenidoTexto], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        
+        // Simular descarga del archivo .mpro personalizado
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `proyecto_mezcla_${new Date().toISOString().slice(0,10)}.mpro`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    });
+
+    // NUEVA FUNCIÓN: Leer un archivo de proyecto .mpro
+    projectFileInput.addEventListener('change', (e) => {
+        const archivo = e.target.files[0];
+        if (!archivo) return;
+
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            try {
+                const datos = JSON.parse(evt.target.result);
+                if (!Array.isArray(datos)) throw new Error();
+
+                // Limpiar mesa de mezcla actual si hubiese algo abierto
+                limpiarTodo();
+
+                proyectoCargadoPendiente = datos;
+
+                // Cambiar el texto de la interfaz para guiar al usuario
+                projectStatus.style.display = "block";
+                projectStatus.innerHTML = `<strong>¡Proyecto cargado con éxito!</strong> Estructura de ${datos.length} pistas lista.<br>⚠️ Ahora toca el botón de abajo y selecciona los archivos de música para activar el reproductor.`;
+                
+                uploadInstruction.innerText = "🚨 Proyecto detectado. Selecciona los archivos de audio correspondientes para encender la mezcla:";
+                uploadInstruction.style.color = "#00adb5";
+                btnUploadLabel.innerText = "⚡ Vincular archivos de audio";
+                
+            } catch (err) {
+                alert("El archivo seleccionado no es un proyecto válido de esta aplicación.");
+            }
+        };
+        reader.readAsText(archivo);
+    });
+
+    function limpiarTodo() {
+        isPlaying = false;
+        audioTracks.forEach(track => {
+            track.audioElement.pause();
+            URL.revokeObjectURL(track.objectURL);
+        });
+        audioTracks = [];
+        container.innerHTML = "";
+        actualizarContadorEtiqueta();
+    }
+
+    // CARGA PRINCIPAL DE PISTAS (Modificada para responder a los archivos vinculados del proyecto)
     fileInput.addEventListener('change', function(e) {
-        const files = e.target.files;
+        const files = Array.from(e.target.files);
         if (files.length === 0) return;
 
         if (!audioCtx) {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         }
 
-        Array.from(files).forEach((file) => {
+        files.forEach((file) => {
+            const cleanFileName = file.name.replace(/\.[^/.]+$/, "");
+            
+            // Valores por defecto
+            let volInicial = 1;
+            let muteInicial = false;
+            let soloInicial = false;
+
+            // Si hay un proyecto cargado en memoria, buscamos si este archivo pertenece a él para restaurar su volumen/estado
+            if (proyectoCargadoPendiente) {
+                const configGuardada = proyectoCargadoPendiente.find(p => p.fileName === file.name || p.fileName === cleanFileName);
+                if (configGuardada) {
+                    volInicial = configGuardada.volume;
+                    muteInicial = configGuardada.isMuted;
+                    soloInicial = configGuardada.isSolo;
+                }
+            }
+
             trackCounter++;
             const trackId = `track-${trackCounter}`;
             const fileURL = URL.createObjectURL(file);
@@ -300,11 +444,12 @@
 
             audioTracks.push({
                 id: trackId,
+                originalName: file.name,
                 audioElement: audio,
                 objectURL: fileURL,
                 analyser: analyser,
-                isMuted: false,
-                isSolo: false,
+                isMuted: muteInicial,
+                isSolo: soloInicial,
                 duration: 0
             });
 
@@ -315,9 +460,9 @@
                 <div class="track-header">
                     <div class="track-name-wrapper">
                         <button class="btn-delete" data-id="${trackId}">❌</button>
-                        <span class="track-title-text">${file.name.replace(/\.[^/.]+$/, "")}</span>
+                        <span class="track-title-text">${cleanFileName}</span>
                     </div>
-                    <span class="vol-label">100%</span>
+                    <span class="vol-label" id="vollabel-${trackId}">${Math.round(volInicial * 100)}%</span>
                 </div>
                 
                 <div class="visual-area">
@@ -332,12 +477,15 @@
                 </div>
 
                 <div class="track-controls">
-                    <button class="btn-mute" data-id="${trackId}">Mute</button>
-                    <button class="btn-solo" data-id="${trackId}">Solo</button>
-                    <input type="range" class="vol-slider" data-id="${trackId}" min="0" max="1" step="0.01" value="1">
+                    <button class="btn-mute ${muteInicial ? 'active-mute' : ''}" data-id="${trackId}">Mute</button>
+                    <button class="btn-solo ${soloInicial ? 'active-solo' : ''}" data-id="${trackId}">Solo</button>
+                    <input type="range" class="vol-slider" data-id="${trackId}" min="0" max="1" step="0.01" value="${volInicial}">
                 </div>
             `;
             container.appendChild(trackDiv);
+
+            // Ajustar volumen inicial cargado
+            audio.volume = volInicial;
 
             const canvas = document.getElementById(`canvas-${trackId}`);
             canvas.width = canvas.offsetWidth;
@@ -365,6 +513,15 @@
                 }
             });
         });
+
+        // Si se completó de procesar la vinculación del proyecto, restauramos los textos originales
+        if (proyectoCargadoPendiente) {
+            proyectoCargadoPendiente = null;
+            projectStatus.style.display = "none";
+            uploadInstruction.innerText = "Selecciona tus pistas de audio a la vez";
+            uploadInstruction.style.color = "white";
+            btnUploadLabel.innerText = "📁 Cargar Pistas";
+        }
 
         actualizarContadorEtiqueta();
         actualizarMezcla(); 
@@ -561,7 +718,7 @@
             const track = audioTracks.find(t => t.id === id);
             if (track) {
                 track.audioElement.volume = vol;
-                e.target.closest('.track').querySelector('.vol-label').innerText = `${Math.round(vol * 100)}%`;
+                document.getElementById(`vollabel-${id}`).innerText = `${Math.round(vol * 100)}%`;
             }
         }
     });
@@ -602,7 +759,7 @@
     });
 
     function actualizarMezcla() {
-        const hayAlguienEnSolo = audioTracks.some(t => t.isSolo);
+        const hayAlguien EnSolo = audioTracks.some(t => t.isSolo);
         audioTracks.forEach(track => {
             const canvas = document.getElementById(`canvas-${track.id}`);
             if (hayAlguienEnSolo) {
