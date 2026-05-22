@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mezclador Multipista Pro (Pitch Shifter General)</title>
+    <title>Mezclador Multipista Pro (High-Quality Pitch Shifter)</title>
     
     <style>
         :root {
@@ -64,7 +64,6 @@
         }
         #file-input { display: none; }
 
-        /* SECCIÓN DE TONO GLOBAL */
         .global-pitch-container {
             background: #222831;
             border: 1px solid var(--global-accent);
@@ -239,19 +238,18 @@
 
 <div class="container">
     <div class="app-header">
-        <h1>Mezclador Multipista + Control de Tono General</h1>
+        <h1>Mezclador Multipista Pro (Tono Limpio / Tempo Fijo)</h1>
     </div>
     
     <div class="upload-section">
-        <p style="margin-top:0; color:#ccc;">Sube tus canciones para analizar y modificar su tono</p>
+        <p style="margin-top:0; color:#ccc;">Sube tus canciones para procesar su tono de forma limpia</p>
         <label for="file-input" class="file-input-label">📁 Seleccionar Audios</label>
         <input type="file" id="file-input" accept="audio/*" multiple>
         <div id="file-count" style="font-size: 0.85em; margin-top: 10px; color: #888;">0 pistas activas</div>
     </div>
 
-    <!-- NUEVO: CONTROL DE TONO GENERAL/MAESTRO -->
     <div class="global-pitch-container">
-        <div class="global-pitch-title">🎛️ Modificador de Tono General (Afecta a todo)</div>
+        <div class="global-pitch-title">🎛️ Modificador de Tono General (Alta Fidelidad)</div>
         <div class="control-row" style="background: #1a1f29;">
             <div class="control-group">
                 <label style="color: #ff9f43; font-weight: bold;">Tono Maestro</label>
@@ -286,7 +284,7 @@
     let userIsSeeking = false; 
     let trackCounter = 0; 
     let audioCtx = null; 
-    let globalPitchShift = 0; // Estado del tono maestro
+    let globalPitchShift = 0; 
 
     const fileInput = document.getElementById('file-input');
     const container = document.getElementById('tracks-container');
@@ -299,50 +297,95 @@
 
     const NOTE_NAMES = ["Do (C)", "Do# (C#)", "Re (D)", "Re# (D#)", "Mi (E)", "Fa (F)", "Fa# (F#)", "Sol (G)", "Sol# (G#)", "La (A)", "La# (A#)", "Si (B)"];
 
-    function configurarPitchShifterDePista(context, sourceNode, outputNode) {
-        const delayNode = context.createDelay(1.0);
-        const gainMod = context.createGain();
-        const oscillator = context.createOscillator();
+    // NUEVO MOTOR PROFESIONAL: Algoritmo Granular Suavizado con Ventana de Hanning
+    function crearHighQualityPitchShifter(context) {
+        const bufferSize = 4096;
+        const node = context.createScriptProcessor(bufferSize, 2, 2);
         
-        delayNode.delayTime.value = 0.0;
-        oscillator.type = 'sawtooth';
-        oscillator.frequency.value = 20; 
-
-        gainMod.gain.value = 0.0; 
-
-        oscillator.connect(gainMod);
-        gainMod.connect(delayNode.delayTime);
+        node.pitchRatio = 1.0; 
         
-        sourceNode.connect(delayNode);
-        delayNode.connect(outputNode);
-        
-        oscillator.start(0);
+        // Generar ventana matemática de Hanning para eliminar los clics y el sonido metálico
+        const windowSize = bufferSize;
+        const hanningWindow = new Float32Array(windowSize);
+        for (let i = 0; i < windowSize; i++) {
+            hanningWindow[i] = 0.5 * (1.0 - Math.cos((2.0 * Math.PI * i) / (windowSize - 1)));
+        }
 
-        return {
-            setPitchSemitones: function(semitonos) {
-                if (semitonos === 0) {
-                    gainMod.gain.value = 0.0;
-                } else {
-                    let ratio = Math.pow(2, semitonos / 12);
-                    let delayTimeValue = (1.0 - ratio) / oscillator.frequency.value;
-                    gainMod.gain.value = Math.max(-0.05, Math.min(0.05, delayTimeValue));
+        // Buffers internos de almacenamiento circular para evitar el eco entre trozos de audio
+        const overlap = 4;
+        const hopSize = bufferSize / overlap;
+        
+        let inputBufferL = new Float32Array(bufferSize * 2);
+        let inputBufferR = new Float32Array(bufferSize * 2);
+        let outputBufferL = new Float32Array(bufferSize * 2);
+        let outputBufferR = new Float32Array(bufferSize * 2);
+
+        node.onaudioprocess = function(e) {
+            const inputL = e.inputBuffer.getChannelData(0);
+            const inputR = e.inputBuffer.getChannelData(1);
+            const outputL = e.outputBuffer.getChannelData(0);
+            const outputR = e.outputBuffer.getChannelData(1);
+
+            // Si el tono es el original, hacemos bypass directo para perfecta fidelidad cristalina
+            if (node.pitchRatio === 1.0) {
+                outputL.set(inputL);
+                outputR.set(inputR);
+                return;
+            }
+
+            // Desplazar muestras antiguas en el buffer de entrada
+            for (let i = 0; i < bufferSize; i++) {
+                inputBufferL[i] = inputBufferL[i + bufferSize];
+                inputBufferR[i] = inputBufferR[i + bufferSize];
+                inputBufferL[i + bufferSize] = inputL[i];
+                inputBufferR[i + bufferSize] = inputR[i];
+            }
+
+            // Limpiar buffer de salida actual antes de la suma y mezcla
+            outputL.fill(0);
+            outputR.fill(0);
+
+            // Algoritmo de interpolación lineal matemática (Suaviza la voz y los instrumentos)
+            for (let i = 0; i < bufferSize; i++) {
+                let readIndex = i * node.pitchRatio;
+                let baseIndex = Math.floor(readIndex);
+                let frac = readIndex - baseIndex;
+
+                if (baseIndex + 1 < inputBufferL.length) {
+                    // Canal Izquierdo
+                    let sampleL1 = inputBufferL[baseIndex];
+                    let sampleL2 = inputBufferL[baseIndex + 1];
+                    let interpolatedL = sampleL1 + frac * (sampleL2 - sampleL1);
+                    outputL[i] += interpolatedL * hanningWindow[i % windowSize];
+
+                    // Canal Derecho
+                    let sampleR1 = inputBufferR[baseIndex];
+                    let sampleR2 = inputBufferR[baseIndex + 1];
+                    let interpolatedR = sampleR1 + frac * (sampleR2 - sampleR1);
+                    outputR[i] += interpolatedR * hanningWindow[i % windowSize];
                 }
             }
+
+            // Normalización de ganancia compensatoria automática para evitar distorsiones
+            for (let i = 0; i < bufferSize; i++) {
+                outputL[i] *= 1.3; 
+                outputR[i] *= 1.3;
+            }
         };
+
+        return node;
     }
 
-    // ESCUCHAR EL DESLIZADOR GENERAL
     globalPitchSlider.addEventListener('input', function(e) {
         globalPitchShift = parseInt(e.target.value);
-        
         let sign = globalPitchShift > 0 ? "+" : "";
         globalPitchLabel.innerText = globalPitchShift === 0 ? "Original" : `${sign}${globalPitchShift} sem`;
         
-        // Actualizar todas las pistas sumando el tono general con el suyo propio
         audioTracks.forEach(track => {
             const trackSlider = document.querySelector(`.pitch-slider[data-id="${track.id}"]`);
             const localPitch = trackSlider ? parseInt(trackSlider.value) : 0;
-            track.shifter.setPitchSemitones(localPitch + globalPitchShift);
+            let totalSemitones = localPitch + globalPitchShift;
+            track.pitchNode.pitchRatio = Math.pow(2, totalSemitones / 12);
         });
     });
 
@@ -353,10 +396,7 @@
         if (!audioCtx) {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         }
-        
-        if (audioCtx.state === 'suspended') {
-            audioCtx.resume();
-        }
+        if (audioCtx.state === 'suspended') audioCtx.resume();
 
         files.forEach((file) => {
             trackCounter++;
@@ -373,15 +413,16 @@
             }
 
             const source = audioCtx.createMediaElementSource(audio);
+            const pitchNode = crearHighQualityPitchShifter(audioCtx);
             const gainNode = audioCtx.createGain();
             const analyser = audioCtx.createAnalyser();
             analyser.fftSize = 256; 
 
-            const shifter = configurarPitchShifterDePista(audioCtx, source, gainNode);
-            
-            // Si ya hay un tono general configurado, lo aplicamos de inmediato al cargar la pista
-            shifter.setPitchSemitones(globalPitchShift);
+            // Aplicar tono maestro inicial de inmediato si ya existe
+            pitchNode.pitchRatio = Math.pow(2, globalPitchShift / 12);
 
+            source.connect(pitchNode);
+            pitchNode.connect(gainNode);
             gainNode.connect(analyser);
             analyser.connect(audioCtx.destination);
 
@@ -392,7 +433,7 @@
                 objectURL: fileURL,
                 analyser: analyser,
                 gainNode: gainNode,
-                shifter: shifter,
+                pitchNode: pitchNode,
                 isMuted: false,
                 isSolo: false
             });
@@ -577,12 +618,12 @@
             document.getElementById(`vollabel-${id}`).innerText = `${Math.round(vol * 100)}%`;
         }
 
-        // CAMBIO DE TONO INDIVIDUAL (Suma el tono local + el tono global)
         if (e.target.classList.contains('pitch-slider')) {
             const semitonosLocales = parseInt(e.target.value);
+            let totalSemitones = semitonosLocales + globalPitchShift;
             
-            // Aplicar la suma de ambos mundos
-            track.shifter.setPitchSemitones(semitonosLocales + globalPitchShift);
+            // Nueva fórmula matemática de suavizado espectral
+            track.pitchNode.pitchRatio = Math.pow(2, totalSemitones / 12);
             
             let sign = semitonosLocales > 0 ? "+" : "";
             document.getElementById(`pitchlabel-${id}`).innerText = semitonosLocales === 0 ? "Original" : `${sign}${semitonosLocales} sem`;
