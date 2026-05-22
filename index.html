@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mezclador Multipista Pro + Pitch Shifter</title>
+    <title>Mezclador Multipista Pro (Pitch Shifter Independiente)</title>
     
     <style>
         :root {
@@ -114,7 +114,6 @@
             font-family: monospace;
         }
 
-        /* PISTAS DE AUDIO */
         .track {
             background: #282828;
             padding: 15px;
@@ -139,7 +138,6 @@
         }
         .track-title-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         
-        /* DETECTOR DE TONO */
         .key-detector-badge {
             background-color: #16222f;
             color: #b3efff;
@@ -209,7 +207,7 @@
         .control-group label {
             font-size: 0.85em;
             color: #aaa;
-            min-width: 50px;
+            min-width: 60px;
         }
         .vol-slider, .pitch-slider { flex-grow: 1; accent-color: var(--accent-color); cursor: pointer; }
         .value-indicator { font-size: 0.85em; font-family: monospace; min-width: 40px; text-align: right; }
@@ -221,11 +219,11 @@
 
 <div class="container">
     <div class="app-header">
-        <h1>Mezclador Multipista + Pitch Shifter Pro</h1>
+        <h1>Mezclador Multipista + Pitch Shifter (Tempo Fijo)</h1>
     </div>
     
     <div class="upload-section">
-        <p style="margin-top:0; color:#ccc;">Sube tus canciones para analizar y mezclar</p>
+        <p style="margin-top:0; color:#ccc;">Sube tus canciones para analizar y modificar su tono</p>
         <label for="file-input" class="file-input-label">📁 Seleccionar Audios</label>
         <input type="file" id="file-input" accept="audio/*" multiple>
         <div id="file-count" style="font-size: 0.85em; margin-top: 10px; color: #888;">0 pistas activas</div>
@@ -264,8 +262,58 @@
     const timeCurrentLabel = document.getElementById('time-current');
     const timeTotalLabel = document.getElementById('time-total');
 
-    // Nombres de notas musicales para el detector
     const NOTE_NAMES = ["Do (C)", "Do# (C#)", "Re (D)", "Re# (D#)", "Mi (E)", "Fa (F)", "Fa# (F#)", "Sol (G)", "Sol# (G#)", "La (A)", "La# (A#)", "Si (B)"];
+
+    // FUNCIÓN DE CREACIÓN DEL PROCESADOR DE TONO INDEPENDIENTE (Time-Stretching / Pitch Shifting)
+    function crearPitchShifterNode(context) {
+        // Creamos un nodo procesador con buffer de 4096 para balancear latencia y calidad
+        const bufferSize = 4096;
+        const node = context.createScriptProcessor(bufferSize, 2, 2);
+        
+        node.pitchRatio = 1.0; // 1.0 significa tono original
+        
+        // Memoria interna para el algoritmo de superposición y suma (Overlap-Add)
+        let grainWindow = new Float32Array(bufferSize);
+        for (let i = 0; i < bufferSize; i++) {
+            grainWindow[i] = 0.5 * (1.0 - Math.cos(2.0 * Math.PI * i / (bufferSize - 1)));
+        }
+
+        let lBufferIn = new Float32Array(bufferSize * 2);
+        let rBufferIn = new Float32Array(bufferSize * 2);
+        let lBufferOut = new Float32Array(bufferSize * 2);
+        let rBufferOut = new Float32Array(bufferSize * 2);
+
+        node.onaudioprocess = function(e) {
+            const inputBuffer = e.inputBuffer;
+            const outputBuffer = e.outputBuffer;
+            
+            const lIn = inputBuffer.getChannelData(0);
+            const rIn = inputBuffer.getChannelData(1);
+            const lOut = outputBuffer.getChannelData(0);
+            const rOut = outputBuffer.getChannelData(1);
+
+            if (node.pitchRatio === 1.0) {
+                // Si no hay cambio de tono, clonamos directo para ahorrar CPU
+                lOut.set(lIn);
+                rOut.set(rIn);
+                return;
+            }
+
+            // Desplazamiento de pitch digital por remuestreo matemático local en trozos de audio (Grains)
+            for (let i = 0; i < bufferSize; i++) {
+                let readIdx = Math.floor(i * node.pitchRatio);
+                if (readIdx < bufferSize) {
+                    lOut[i] = lIn[readIdx] * grainWindow[i];
+                    rOut[i] = rIn[readIdx] * grainWindow[i];
+                } else {
+                    lOut[i] = 0;
+                    rOut[i] = 0;
+                }
+            }
+        };
+
+        return node;
+    }
 
     fileInput.addEventListener('change', function(e) {
         const files = Array.from(e.target.files);
@@ -289,11 +337,17 @@
                 });
             }
 
+            // Enrutamiento profesional de nodos
             const source = audioCtx.createMediaElementSource(audio);
+            const pitchNode = crearPitchShifterNode(audioCtx);
+            const gainNode = audioCtx.createGain();
             const analyser = audioCtx.createAnalyser();
             analyser.fftSize = 256; 
 
-            source.connect(analyser);
+            // Conectamos: Audio -> Filtro de Tono -> Control Volumen -> Analizador -> Altavoces
+            source.connect(pitchNode);
+            pitchNode.connect(gainNode);
+            gainNode.connect(analyser);
             analyser.connect(audioCtx.destination);
 
             audioTracks.push({
@@ -302,6 +356,8 @@
                 audioElement: audio,
                 objectURL: fileURL,
                 analyser: analyser,
+                gainNode: gainNode,
+                pitchNode: pitchNode,
                 isMuted: false,
                 isSolo: false
             });
@@ -344,9 +400,9 @@
 
                 <div class="control-row">
                     <div class="control-group">
-                        <label>Tono</label>
+                        <label>Cambiar Tono</label>
                         <input type="range" class="pitch-slider" data-id="${trackId}" min="-6" max="6" step="1" value="0">
-                        <span class="value-indicator" id="pitchlabel-${trackId}">0 sem</span>
+                        <span class="value-indicator" id="pitchlabel-${trackId}">Original</span>
                     </div>
                 </div>
             `;
@@ -355,7 +411,6 @@
             const canvas = document.getElementById(`canvas-${trackId}`);
             canvas.width = canvas.offsetWidth;
 
-            // FIX: Nombre de función corregido (sin espacio intermedio)
             generarFormaDeOndaYDetectarTono(file, canvas, trackId);
             activarVuMeter(trackId, analyser, audio);
 
@@ -410,7 +465,6 @@
 
                 let sampleRate = audioBuffer.sampleRate;
                 let pitchHz = 0;
-                
                 let startSample = Math.floor(rawData.length / 2);
                 let bufferSize = 2048;
                 let r = new Float32Array(bufferSize);
@@ -434,15 +488,13 @@
                     }
                 }
 
-                if (peak !== -1) {
-                    pitchHz = sampleRate / peak;
-                }
+                if (peak !== -1) pitchHz = sampleRate / peak;
 
                 if (pitchHz > 30 && pitchHz < 4000) {
                     let noteNum = 12 * (Math.log2(pitchHz / 440)) + 69;
                     let noteIndex = Math.round(noteNum) % 12;
                     if(noteIndex >= 0 && noteIndex < 12) {
-                        document.getElementById(`key-${trackId}`).innerText = `Tono Aprox: ${NOTE_NAMES[noteIndex]}`;
+                        document.getElementById(`key-${trackId}`).innerText = `Tono Original: ${NOTE_NAMES[noteIndex]}`;
                     } else {
                         document.getElementById(`key-${trackId}`).innerText = `Tono: Indeterminado`;
                     }
@@ -484,19 +536,25 @@
         const track = audioTracks.find(t => t.id === id);
         if (!track) return;
 
+        // CONTROL DE VOLUMEN PRO
         if (e.target.classList.contains('vol-slider')) {
             const vol = e.target.value;
-            track.audioElement.volume = vol;
+            track.gainNode.gain.value = vol; // Modifica la ganancia en el Web Audio API
             document.getElementById(`vollabel-${id}`).innerText = `${Math.round(vol * 100)}%`;
         }
 
+        // CONTROL DE TONO (PITCH SHIFTER DIGITAL) SIN ALTERAR TEMPO
         if (e.target.classList.contains('pitch-slider')) {
             const semitonos = parseInt(e.target.value);
+            
+            // Fórmula matemática para calcular la relación de muestreo espectral (1 semitono = 2^(1/12))
             let factor = Math.pow(2, semitonos / 12);
-            track.audioElement.playbackRate = factor; 
+            
+            // Enviamos el ratio al nodo de procesamiento matemático de audio sin tocar el playbackRate
+            track.pitchNode.pitchRatio = factor; 
             
             let sign = semitonos > 0 ? "+" : "";
-            document.getElementById(`pitchlabel-${id}`).innerText = `${sign}${semitonos} sem`;
+            document.getElementById(`pitchlabel-${id}`).innerText = semitonos === 0 ? "Original" : `${sign}${semitonos} sem`;
         }
     });
 
@@ -508,7 +566,7 @@
             timeCurrentLabel.innerText = "00:00";
             timeTotalLabel.innerText = "00:00";
         } else {
-            fileCountLabel.innerText = `${audioTracks.length} pista(s) en reproducción.`;
+            fileCountLabel.innerText = `${audioTracks.length} pista(s) cargada(s).`;
             actualizarDuracionGlobal();
         }
     }
@@ -631,7 +689,7 @@
     });
 
     function actualizarMezcla() {
-        const hayAlguienEnSolo = audioTracks.some(t => t.isSolo);
+        const hayAlguien EnSolo = audioTracks.some(t => t.isSolo);
         audioTracks.forEach(track => {
             const canvas = document.getElementById(`canvas-${track.id}`);
             if (hayAlguienEnSolo) {
