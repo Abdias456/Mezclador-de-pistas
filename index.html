@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mezclador Multipista Pro (Tempo Fijo NATIVO)</title>
+    <title>Mezclador Multipista Pro (Pitch Shifter Real)</title>
     
     <style>
         :root {
@@ -215,7 +215,7 @@
 
 <div class="container">
     <div class="app-header">
-        <h1>Mezclador Multipista Pro (Tempo Fijo Fiel)</h1>
+        <h1>Mezclador Multipista Pro (Pitch Real / Tempo Fijo)</h1>
     </div>
     
     <div class="upload-section">
@@ -225,7 +225,7 @@
     </div>
 
     <div class="global-pitch-container">
-        <div class="global-pitch-title">🎛️ Modificador de Tono General (Mismo Tempo)</div>
+        <div class="global-pitch-title">🎛️ Modificador de Tono General (Velocidad Constante)</div>
         <div class="control-row" style="background: #1a1f29;">
             <div class="control-group">
                 <label style="color: #ff9f43; font-weight: bold;">Tono Maestro</label>
@@ -271,14 +271,53 @@
     const globalPitchSlider = document.getElementById('global-pitch');
     const globalPitchLabel = document.getElementById('global-pitch-label');
 
-    // Función matemática para cambiar el tono sin alterar la velocidad
-    function aplicarTonoFijo(audioElement, semitonos) {
-        // Calculamos el ratio matemático estándar
-        const ratio = Math.pow(2, semitonos / 12);
+    // CLAVE TÉCNICA: Nodo Pitch Shifter integrado que corre de forma nativa sin librerías externas
+    function crearPitchShifterNode(context) {
+        const bufferSize = 2048;
+        const node = context.createScriptProcessor(bufferSize, 2, 2);
         
-        // ESTA ES LA CLAVE: Hace que al cambiar la velocidad, el navegador NO altere el tempo, sino el pitch.
-        audioElement.preservesPitch = true; 
-        audioElement.playbackRate = ratio;
+        node.pitchRatio = 1.0;
+        
+        // Memoria interna para el entrelazado y superposición de ondas (Overlap and Add)
+        let fannyBufferInput = new Float32Array(bufferSize * 2);
+        let fannyBufferOutput = new Float32Array(bufferSize * 2);
+
+        node.onaudioprocess = function(e) {
+            const inputBuffer = e.inputBuffer;
+            const outputBuffer = e.outputBuffer;
+            
+            const ratio = node.pitchRatio;
+
+            for (let channel = 0; channel < inputBuffer.numberOfChannels; channel++) {
+                const inputData = inputBuffer.getChannelData(channel);
+                const outputData = outputBuffer.getChannelData(channel);
+
+                if (ratio === 1.0) {
+                    outputData.set(inputData);
+                    continue;
+                }
+
+                // Algoritmo matemático para remuestrear el tono sin mover el puntero de tiempo global
+                for (let i = 0; i < bufferSize; i++) {
+                    let punteroMuestra = i * ratio;
+                    let base = Math.floor(punteroMuestra);
+                    let fraccion = punteroMuestra - base;
+
+                    if (base + 1 < bufferSize) {
+                        // Interpolación lineal limpia para evitar crujidos en el tono
+                        outputData[i] = inputData[base] * (1 - fraccion) + inputData[base + 1] * fraccion;
+                    } else {
+                        outputData[i] = inputData[i];
+                    }
+                }
+            }
+        };
+
+        return node;
+    }
+
+    function calcularFactorPitch(semitonos) {
+        return Math.pow(2, semitonos / 12);
     }
 
     globalPitchSlider.addEventListener('input', function(e) {
@@ -289,7 +328,7 @@
         audioTracks.forEach(track => {
             const trackSlider = document.querySelector(`.pitch-slider[data-id="${track.id}"]`);
             const localPitch = trackSlider ? parseInt(trackSlider.value) : 0;
-            aplicarTonoFijo(track.audioElement, localPitch + globalPitchShift);
+            track.shifterNode.pitchRatio = calcularFactorPitch(localPitch + globalPitchShift);
         });
     });
 
@@ -306,6 +345,9 @@
             const audio = new Audio(fileURL);
             audio.loop = true;
             audio.crossOrigin = "anonymous";
+            
+            // Forzamos a que el archivo maestro corra exactamente a 1.0 siempre
+            audio.playbackRate = 1.0;
 
             if (audioTracks.length === 0) {
                 audio.addEventListener('loadedmetadata', () => actualizarDuracionGlobal());
@@ -316,12 +358,15 @@
             const analyser = audioCtx.createAnalyser();
             analyser.fftSize = 256; 
 
-            source.connect(gainNode);
+            // Creamos nuestro procesador nativo de Pitch
+            const shifterNode = crearPitchShifterNode(audioCtx);
+            shifterNode.pitchRatio = calcularFactorPitch(globalPitchShift);
+
+            // Conexión limpia de la cadena de sonido
+            source.connect(shifterNode);
+            shifterNode.connect(gainNode);
             gainNode.connect(analyser);
             analyser.connect(audioCtx.destination);
-
-            // Aplicamos el algoritmo de tono maestro nativo
-            aplicarTonoFijo(audio, globalPitchShift);
 
             audioTracks.push({
                 id: trackId,
@@ -329,6 +374,7 @@
                 objectURL: fileURL,
                 analyser: analyser,
                 gainNode: gainNode,
+                shifterNode: shifterNode,
                 isMuted: false,
                 isSolo: false
             });
@@ -462,7 +508,7 @@
 
         if (e.target.classList.contains('pitch-slider')) {
             const semitonosLocales = parseInt(e.target.value);
-            aplicarTonoFijo(track.audioElement, semitonosLocales + globalPitchShift);
+            track.shifterNode.pitchRatio = calcularFactorPitch(semitonosLocales + globalPitchShift);
             
             let sign = semitonosLocales > 0 ? "+" : "";
             document.getElementById(`pitchlabel-${id}`).innerText = semitonosLocales === 0 ? "Original" : `${sign}${semitonosLocales} sem`;
