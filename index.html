@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mezclador Multipista Pro VU METER</title>
+    
+    <link rel="icon" type="image/png" href="logo.png">
+    <link rel="apple-touch-icon" href="logo.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
     <style>
         :root {
             --bg-color: #121212;
@@ -30,7 +36,30 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
             box-sizing: border-box;
         }
-        h1 { text-align: center; color: var(--accent-color); margin-top: 0; }
+        
+        /* DISEÑO DE LA CABECERA CON TU LOGOTIPO */
+        .app-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        .app-logo {
+            width: 50px;
+            height: 50px;
+            border-radius: 10px;
+            object-fit: cover;
+            box-shadow: 0 2px 8px rgba(0,173,181,0.3);
+            /* Si la imagen no carga, muestra un fondo alternativo */
+            background-color: var(--accent-color); 
+        }
+        h1 { 
+            text-align: center; 
+            color: var(--accent-color); 
+            margin: 0; 
+            font-size: 1.8rem;
+        }
         
         /* Zona de carga */
         .upload-section {
@@ -153,7 +182,7 @@
             bottom: 0;
             left: 0;
             width: 100%;
-            height: 0%; /* Cambia dinámicamente con el audio */
+            height: 0%; 
             background: linear-gradient(to top, #2ecc71 0%, #2ecc71 70%, #f1c40f 70%, #f1c40f 85%, #e74c3c 85%, #e74c3c 100%);
             transition: height 0.05s ease;
         }
@@ -191,7 +220,10 @@
 <body>
 
 <div class="container">
-    <h1>Mi Mezclador Pro Audio VU</h1>
+    <div class="app-header">
+        <img src="logo.png" alt="Logo" class="app-logo" onerror="this.style.display='none'">
+        <h1>Mi Mezclador Pro Audio</h1>
+    </div>
     
     <div class="upload-section">
         <p style="margin-top:0;">Selecciona tus pistas de audio a la vez</p>
@@ -260,10 +292,9 @@
                 audio.play().catch(e => {});
             }
 
-            // ANALIZADOR EN TIEMPO REAL: Para medir los picos de volumen (Vúmetro)
             const source = audioCtx.createMediaElementSource(audio);
             const analyser = audioCtx.createAnalyser();
-            analyser.fftSize = 32; // Tamaño pequeño para lectura rápida de volumen general
+            analyser.fftSize = 32; 
             source.connect(analyser);
             analyser.connect(audioCtx.destination);
 
@@ -277,7 +308,6 @@
                 duration: 0
             });
 
-            // Interfaz de usuario con el Vúmetro (.vu-meter-container) al lado de la Onda
             const trackDiv = document.createElement('div');
             trackDiv.className = 'track';
             trackDiv.id = `node-${trackId}`;
@@ -312,7 +342,6 @@
             const canvas = document.getElementById(`canvas-${trackId}`);
             canvas.width = canvas.offsetWidth;
 
-            // Dibujar aviso de carga inicial en la onda
             const ctx = canvas.getContext('2d');
             ctx.fillStyle = '#151515';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -320,13 +349,9 @@
             ctx.font = '11px sans-serif';
             ctx.fillText('Cargando mapa...', 10, 35);
 
-            // Generar la silueta estática
             generarFormaDeOndaEstatica(file, canvas, trackId);
-
-            // Escuchar el volumen en tiempo real para mover el Vúmetro
             activarVuMeter(trackId, analyser, audio);
 
-            // Clic en la onda para saltar de segundo
             const waveContainer = document.getElementById(`wave-container-${trackId}`);
             waveContainer.addEventListener('click', function(event) {
                 if (audioTracks.length === 0) return;
@@ -345,42 +370,31 @@
         actualizarMezcla(); 
     });
 
-    // LÓGICA DEL VÚMETRO: Lee la potencia del volumen actual constantemente
     function activarVuMeter(trackId, analyser, audio) {
         const vuBar = document.getElementById(`vubar-${trackId}`);
         const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
         function actualizar() {
-            // Si la pista se elimina, detenemos el ciclo
             if (!document.getElementById(`vubar-${trackId}`)) return;
-
             requestAnimationFrame(actualizar);
 
-            // Solo calcular volumen si la app le dio PLAY y la pista no está muteada internamente
             if (isPlaying && !audio.muted) {
                 analyser.getByteFrequencyData(dataArray);
-                
-                // Obtener el promedio de potencia de todas las frecuencias en este instante
                 let total = 0;
                 for (let i = 0; i < dataArray.length; i++) {
                     total += dataArray[i];
                 }
                 let promedio = total / dataArray.length;
-                
-                // Convertir a porcentaje (0 a 100%)
-                let porcentajeVolumen = (promedio / 160) * 100; // 160 equilibra la sensibilidad en dispositivos móviles
+                let porcentajeVolumen = (promedio / 160) * 100; 
                 if (porcentajeVolumen > 100) porcentajeVolumen = 100;
-
                 vuBar.style.height = `${porcentajeVolumen}%`;
             } else {
-                // Si está en pausa o mute, el vúmetro cae inmediatamente a 0
                 vuBar.style.height = '0%';
             }
         }
         actualizar();
     }
 
-    // Decodifica el audio completo para dibujar el fondo estático
     function generarFormaDeOndaEstatica(file, canvas, trackId) {
         const reader = new FileReader();
         reader.onload = function(e) {
@@ -412,7 +426,6 @@
                 ctx.clearRect(0, 0, width, height);
                 ctx.fillStyle = '#151515';
                 ctx.fillRect(0, 0, width, height);
-
                 ctx.fillStyle = '#00adb5'; 
 
                 for (let i = 0; i < width; i++) {
@@ -452,7 +465,6 @@
         }
     }
 
-    // Reloj e indicador de progreso rojo de la línea de tiempo
     setInterval(() => {
         if (audioTracks.length > 0 && !userIsSeeking) {
             const current = audioTracks[0].audioElement.currentTime;
@@ -473,7 +485,6 @@
         }
     }, 100);
 
-    // Controles globales
     document.getElementById('btn-play').addEventListener('click', () => {
         if (audioTracks.length === 0) return;
         if (audioCtx && audioCtx.state === 'suspended') {
@@ -543,7 +554,6 @@
         }
     }
 
-    // Control de volumen individual
     container.addEventListener('input', (e) => {
         if (e.target.classList.contains('vol-slider')) {
             const id = e.target.dataset.id;
@@ -556,7 +566,6 @@
         }
     });
 
-    // Clicks en Mute, Solo o Eliminar
     container.addEventListener('click', (e) => {
         const id = e.target.dataset.id;
         if (!id) return;
