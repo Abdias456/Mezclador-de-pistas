@@ -3,11 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mezclador Multipista Pro (Tempo Normal + Tono Pro)</title>
+    <title>Mezclador Multipista Pro (Tempo Fijo NATIVO)</title>
     
-    <!-- IMPORTAMOS LA LIBRERÍA DE AUDIO PROFESIONAL JUNGLE -->
-    <script src="https://cdn.jsdelivr.net/gh/ctnelson/jungle@master/jungle-pitch-shifter.js"></script>
-
     <style>
         :root {
             --bg-color: #121212;
@@ -218,7 +215,7 @@
 
 <div class="container">
     <div class="app-header">
-        <h1>Mezclador Multipista Pro (Tempo Normal + Tono Pro)</h1>
+        <h1>Mezclador Multipista Pro (Tempo Fijo Fiel)</h1>
     </div>
     
     <div class="upload-section">
@@ -228,7 +225,7 @@
     </div>
 
     <div class="global-pitch-container">
-        <div class="global-pitch-title">🎛️ Modificador de Tono General (Velocidad Fija)</div>
+        <div class="global-pitch-title">🎛️ Modificador de Tono General (Mismo Tempo)</div>
         <div class="control-row" style="background: #1a1f29;">
             <div class="control-group">
                 <label style="color: #ff9f43; font-weight: bold;">Tono Maestro</label>
@@ -274,8 +271,14 @@
     const globalPitchSlider = document.getElementById('global-pitch');
     const globalPitchLabel = document.getElementById('global-pitch-label');
 
-    function semitonosARatio(semitonos) {
-        return Math.pow(2, semitonos / 12) - 1; 
+    // Función matemática para cambiar el tono sin alterar la velocidad
+    function aplicarTonoFijo(audioElement, semitonos) {
+        // Calculamos el ratio matemático estándar
+        const ratio = Math.pow(2, semitonos / 12);
+        
+        // ESTA ES LA CLAVE: Hace que al cambiar la velocidad, el navegador NO altere el tempo, sino el pitch.
+        audioElement.preservesPitch = true; 
+        audioElement.playbackRate = ratio;
     }
 
     globalPitchSlider.addEventListener('input', function(e) {
@@ -286,7 +289,7 @@
         audioTracks.forEach(track => {
             const trackSlider = document.querySelector(`.pitch-slider[data-id="${track.id}"]`);
             const localPitch = trackSlider ? parseInt(trackSlider.value) : 0;
-            track.jungleNode.setPitchOffset(semitonosARatio(localPitch + globalPitchShift));
+            aplicarTonoFijo(track.audioElement, localPitch + globalPitchShift);
         });
     });
 
@@ -303,8 +306,6 @@
             const audio = new Audio(fileURL);
             audio.loop = true;
             audio.crossOrigin = "anonymous";
-            
-            audio.playbackRate = 1.0;
 
             if (audioTracks.length === 0) {
                 audio.addEventListener('loadedmetadata', () => actualizarDuracionGlobal());
@@ -315,14 +316,12 @@
             const analyser = audioCtx.createAnalyser();
             analyser.fftSize = 256; 
 
-            const jungleNode = new Jungle(audioCtx);
-
-            source.connect(jungleNode.input);
-            jungleNode.output.connect(gainNode);
+            source.connect(gainNode);
             gainNode.connect(analyser);
             analyser.connect(audioCtx.destination);
 
-            jungleNode.setPitchOffset(semitonosARatio(globalPitchShift));
+            // Aplicamos el algoritmo de tono maestro nativo
+            aplicarTonoFijo(audio, globalPitchShift);
 
             audioTracks.push({
                 id: trackId,
@@ -330,7 +329,6 @@
                 objectURL: fileURL,
                 analyser: analyser,
                 gainNode: gainNode,
-                jungleNode: jungleNode,
                 isMuted: false,
                 isSolo: false
             });
@@ -464,7 +462,7 @@
 
         if (e.target.classList.contains('pitch-slider')) {
             const semitonosLocales = parseInt(e.target.value);
-            track.jungleNode.setPitchOffset(semitonosARatio(semitonosLocales + globalPitchShift));
+            aplicarTonoFijo(track.audioElement, semitonosLocales + globalPitchShift);
             
             let sign = semitonosLocales > 0 ? "+" : "";
             document.getElementById(`pitchlabel-${id}`).innerText = semitonosLocales === 0 ? "Original" : `${sign}${semitonosLocales} sem`;
